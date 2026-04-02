@@ -1,0 +1,111 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Панель управления</title>
+  <link rel="stylesheet" href="style.css" />
+  <link rel="stylesheet" href="admin.css" />
+</head>
+<body>
+
+  <header class="dash-header">
+    <div class="dash-header-inner">
+      <a href="/" class="header-logo">
+        <svg width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+          <path d="M20 7H4a2 2 0 0 0-2 2v6a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V9a2 2 0 0 0-2-2Z"/>
+          <path d="M16 7V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v2"/>
+        </svg>
+        <span>Logistics</span>
+      </a>
+      <nav class="admin-nav">
+        <a href="/admin.html"       class="admin-nav-link active">Dashboard</a>
+        <a href="/shipments.html"   class="admin-nav-link">Отправки</a>
+        <a href="/upload.html"      class="admin-nav-link">Создать отгрузку</a>
+        <a href="/history.html"     class="admin-nav-link">История</a>
+        <a href="/"                 class="admin-nav-link">Клиентский вход</a>
+      </nav>
+      <button class="btn-ghost" id="refreshBtn" title="Обновить данные">
+        <svg width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+          <path d="M23 4v6h-6"/><path d="M1 20v-6h6"/>
+          <path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/>
+        </svg>
+        Обновить
+      </button>
+    </div>
+  </header>
+
+  <main class="page-content">
+
+    <!-- Loading -->
+    <div id="loadingState" class="state-center">
+      <div class="spinner"></div>
+      <p class="state-desc">Загружаем данные…</p>
+    </div>
+
+    <!-- Error -->
+    <div id="errorState" class="state-center hidden">
+      <div class="state-icon red">
+        <svg width="24" height="24" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+          <circle cx="12" cy="12" r="10"/><line x1="15" y1="9" x2="9" y2="15"/><line x1="9" y1="9" x2="15" y2="15"/>
+        </svg>
+      </div>
+      <p class="state-title">Ошибка загрузки</p>
+      <p class="state-desc" id="errorMsg"></p>
+      <button class="state-btn" onclick="loadAll()">Попробовать снова</button>
+    </div>
+
+    <div id="content" class="hidden">
+
+      <!-- Row 1: Main metrics -->
+      <div class="metrics-grid" id="metricsGrid"></div>
+
+      <!-- Row 2: Chart + Problems + Top clients -->
+      <div class="admin-row">
+        <!-- Daily chart -->
+        <div class="admin-card flex-2">
+          <div class="card-title">Активность за 14 дней</div>
+          <div class="chart-wrap" id="chartWrap">
+            <canvas id="dailyChart"></canvas>
+          </div>
+          <div class="chart-legend">
+            <span class="legend-dot" style="background:#3b82f6"></span> Поступило
+            <span class="legend-dot" style="background:#10b981;margin-left:16px"></span> Отправлено
+          </div>
+        </div>
+
+        <!-- Problems -->
+        <div class="admin-card flex-1">
+          <div class="card-title">Внимание</div>
+          <div id="problemsList"></div>
+        </div>
+      </div>
+
+      <!-- Row 3: Recent + Top clients -->
+      <div class="admin-row">
+        <!-- Recent arrivals -->
+        <div class="admin-card flex-1">
+          <div class="card-title">Последние поступления</div>
+          <table class="mini-table" id="recentTable"></table>
+        </div>
+
+        <!-- Recent shipped -->
+        <div class="admin-card flex-1">
+          <div class="card-title">Последние отправки</div>
+          <table class="mini-table" id="shippedTable"></table>
+        </div>
+
+        <!-- Top clients -->
+        <div class="admin-card flex-1">
+          <div class="card-title">Топ клиентов на складе</div>
+          <div id="topClientsList"></div>
+        </div>
+      </div>
+
+    </div>
+  </main>
+
+  <script src="utils.js"></script>
+  <script src="admin.js"></script>
+</body>
+</html>

@@ -1,0 +1,197 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Детали отправки</title>
+  <link rel="stylesheet" href="style.css" />
+  <link rel="stylesheet" href="admin.css" />
+  <style>
+    .detail-header {
+      display: flex;
+      align-items: flex-start;
+      justify-content: space-between;
+      gap: 16px;
+      flex-wrap: wrap;
+      margin-bottom: 16px;
+    }
+    .detail-title {
+      font-size: 20px;
+      font-weight: 800;
+      color: var(--text);
+      letter-spacing: -.3px;
+    }
+    .detail-sub {
+      font-size: 13px;
+      color: var(--text-3);
+      margin-top: 3px;
+      font-family: 'Courier New', monospace;
+    }
+    .ship-status {
+      display: inline-block;
+      padding: 4px 12px;
+      border-radius: 20px;
+      font-size: 12px;
+      font-weight: 700;
+    }
+    .ship-status.s-shipped   { background: var(--green-bg);   color: #065f46; }
+    .ship-status.s-transit   { background: #fffbeb;           color: #92400e; }
+    .ship-status.s-delivered { background: var(--primary-bg); color: var(--primary); }
+    .ship-status.s-other     { background: var(--surface-2);  color: var(--text-3); }
+
+    .status-select {
+      padding: 5px 10px;
+      border: 1.5px solid var(--border);
+      border-radius: var(--radius-sm);
+      font-size: 13px;
+      background: var(--surface);
+      color: var(--text);
+      cursor: pointer;
+    }
+    .status-select:focus { outline: none; border-color: var(--primary); }
+
+    .meta-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
+      gap: 10px;
+      margin-bottom: 16px;
+    }
+    .meta-card {
+      background: var(--surface-2);
+      border: 1px solid var(--border-light);
+      border-radius: var(--radius);
+      padding: 12px 14px;
+    }
+    .meta-label { font-size: 11px; font-weight: 600; color: var(--text-3); text-transform: uppercase; letter-spacing: .4px; margin-bottom: 4px; }
+    .meta-value { font-size: 16px; font-weight: 700; color: var(--text); word-break: break-all; }
+
+    /* Edit modal */
+    .edit-field { margin-bottom: 12px; }
+    .edit-field label { display: block; font-size: 12px; font-weight: 600; color: var(--text-2); margin-bottom: 4px; }
+  </style>
+</head>
+<body>
+
+  <header class="dash-header">
+    <div class="dash-header-inner">
+      <a href="/" class="header-logo">
+        <svg width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+          <path d="M20 7H4a2 2 0 0 0-2 2v6a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V9a2 2 0 0 0-2-2Z"/>
+          <path d="M16 7V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v2"/>
+        </svg>
+        <span>Logistics</span>
+      </a>
+      <nav class="admin-nav">
+        <a href="/admin.html"       class="admin-nav-link">Dashboard</a>
+        <a href="/shipments.html"   class="admin-nav-link">Отправки</a>
+        <a href="/upload.html"      class="admin-nav-link">Создать отгрузку</a>
+        <a href="/history.html"     class="admin-nav-link">История</a>
+        <a href="/"                 class="admin-nav-link">Клиентский вход</a>
+      </nav>
+    </div>
+  </header>
+
+  <main class="page-content">
+
+    <div id="loadingState" class="state-center">
+      <div class="spinner"></div>
+      <p class="state-desc">Загружаем отправку…</p>
+    </div>
+
+    <div id="errorState" class="state-center hidden">
+      <div class="state-icon red">
+        <svg width="24" height="24" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+          <circle cx="12" cy="12" r="10"/><line x1="15" y1="9" x2="9" y2="15"/><line x1="9" y1="9" x2="15" y2="15"/>
+        </svg>
+      </div>
+      <p class="state-title">Отправка не найдена</p>
+      <a href="/shipments.html" class="state-btn" style="display:inline-block;text-decoration:none">← К списку отправок</a>
+    </div>
+
+    <div id="content" class="hidden">
+
+      <!-- Back link -->
+      <a href="/shipments.html" style="display:inline-flex;align-items:center;gap:5px;color:var(--text-3);font-size:13px;text-decoration:none;margin-bottom:14px">
+        <svg width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><polyline points="15 18 9 12 15 6"/></svg>
+        К списку отправок
+      </a>
+
+      <!-- Header card -->
+      <div class="admin-card" style="margin-bottom:14px">
+        <div class="detail-header">
+          <div>
+            <div class="detail-title" id="detailCode">—</div>
+            <div class="detail-sub"   id="detailId">—</div>
+          </div>
+          <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap">
+            <span class="ship-status" id="statusBadge">—</span>
+            <select class="status-select" id="statusSelect" title="Изменить статус">
+              <option value="отправлено">Отправлено</option>
+              <option value="в пути">В пути</option>
+              <option value="доставлено">Доставлено</option>
+            </select>
+            <button class="btn-ghost" id="editBtn">Редактировать</button>
+          </div>
+        </div>
+
+        <div class="meta-grid" id="metaGrid"></div>
+      </div>
+
+      <!-- Tracks table -->
+      <div class="admin-card" style="padding:0;overflow:hidden">
+        <div style="padding:14px 20px;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between">
+          <div style="font-size:13px;font-weight:700;text-transform:uppercase;letter-spacing:.4px;color:var(--text)">Треки в отправке</div>
+          <span id="trackCountLabel" style="font-size:12px;color:var(--text-3)"></span>
+        </div>
+        <div class="table-scroll">
+          <table class="items-table">
+            <thead>
+              <tr>
+                <th>Трек-номер</th>
+                <th>Клиент</th>
+                <th>Статус</th>
+                <th>Категория</th>
+                <th>Дата</th>
+                <th>Комментарий</th>
+              </tr>
+            </thead>
+            <tbody id="tracksBody"></tbody>
+          </table>
+        </div>
+      </div>
+
+    </div>
+
+  </main>
+
+  <!-- Edit modal -->
+  <div class="modal-overlay hidden" id="editModal">
+    <div class="modal-inner" style="max-width:420px;width:90%;padding:24px;text-align:left">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px">
+        <div style="font-size:14px;font-weight:700">Редактировать отправку</div>
+        <button class="modal-close" id="editClose">
+          <svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24">
+            <line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>
+          </svg>
+        </button>
+      </div>
+      <div class="edit-field">
+        <label>Вес, кг</label>
+        <input class="input-field" type="number" step="0.01" id="editWeight" placeholder="0.00" />
+      </div>
+      <div class="edit-field">
+        <label>Объём, м³</label>
+        <input class="input-field" type="number" step="0.001" id="editVolume" placeholder="0.000" />
+      </div>
+      <div class="edit-field">
+        <label>Комментарий</label>
+        <input class="input-field" type="text" id="editComment" />
+      </div>
+      <button class="btn-primary" id="editSaveBtn" style="width:100%;margin-top:6px">Сохранить</button>
+    </div>
+  </div>
+
+  <script src="utils.js"></script>
+  <script src="shipment-detail.js"></script>
+</body>
+</html>

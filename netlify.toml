@@ -1,0 +1,13 @@
+[build]
+  publish = "public"
+  command = "node scripts/gen-redirects.js"
+
+[build.environment]
+  NODE_VERSION = "18"
+
+# SPA fallback — not strictly needed (no client-side routing) but safe to have
+[[redirects]]
+  from = "/*"
+  to = "/index.html"
+  status = 200
+  conditions = {Role = ["_no_match"]}

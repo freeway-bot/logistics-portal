@@ -1,0 +1,164 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Поиск по треку</title>
+  <link rel="stylesheet" href="style.css" />
+  <!-- SheetJS for XLSX export -->
+  <script src="https://cdn.sheetjs.com/xlsx-0.20.3/package/dist/xlsx.mini.min.js"></script>
+</head>
+<body>
+
+  <header class="dash-header">
+    <div class="dash-header-inner">
+      <a href="/" class="header-logo">
+        <svg width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+          <path d="M20 7H4a2 2 0 0 0-2 2v6a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V9a2 2 0 0 0-2-2Z"/>
+          <path d="M16 7V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v2"/>
+        </svg>
+        <span>Logistics Portal</span>
+      </a>
+      <div class="header-right">
+        <a href="/?mode=track" class="btn-ghost">
+          <svg width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+            <circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/>
+          </svg>
+          Новый поиск
+        </a>
+        <a href="/" class="btn-ghost">← Главная</a>
+      </div>
+    </div>
+  </header>
+
+  <main class="page-content">
+
+    <!-- Search bar + results info -->
+    <div class="search-page-header">
+      <div class="search-result-info" id="resultInfo">Поиск…</div>
+
+      <div class="search-bar-inline">
+        <input type="text" id="searchInput" placeholder="Новый трек-номер…" />
+        <button class="btn-search" id="searchBtn">Найти</button>
+      </div>
+    </div>
+
+    <!-- Controls: view toggle + export -->
+    <div class="controls-bar" id="controlsBar" style="display:none">
+      <div class="view-toggle">
+        <button class="view-btn active" id="btnTableView" title="Таблица">
+          <svg width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+            <rect x="3" y="3" width="18" height="18" rx="1"/>
+            <line x1="3" y1="9" x2="21" y2="9"/><line x1="3" y1="15" x2="21" y2="15"/>
+            <line x1="9" y1="3" x2="9" y2="21"/>
+          </svg>
+        </button>
+        <button class="view-btn" id="btnGridView" title="Карточки">
+          <svg width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+            <rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/>
+            <rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/>
+          </svg>
+        </button>
+      </div>
+
+      <div style="flex:1"></div>
+
+      <!-- Export -->
+      <div class="export-wrap">
+        <button class="btn-export" id="exportBtn">
+          <svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+            <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
+            <polyline points="7 10 12 15 17 10"/>
+            <line x1="12" y1="15" x2="12" y2="3"/>
+          </svg>
+          Экспорт
+        </button>
+        <div class="export-menu hidden" id="exportMenu">
+          <div class="export-menu-label">Скачать результаты</div>
+          <button class="export-menu-item" id="exportCSVBtn">
+            <svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+              <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
+              <polyline points="14 2 14 8 20 8"/>
+            </svg>
+            Скачать CSV
+          </button>
+          <button class="export-menu-item" id="exportXLSXBtn">
+            <svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+              <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
+              <polyline points="14 2 14 8 20 8"/>
+              <line x1="8" y1="13" x2="16" y2="13"/><line x1="8" y1="17" x2="16" y2="17"/>
+            </svg>
+            Скачать Excel
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Loading -->
+    <div id="loadingState" class="state-center">
+      <div class="spinner"></div>
+      <p class="state-desc">Ищем грузы…</p>
+    </div>
+
+    <!-- Error -->
+    <div id="errorState" class="state-center hidden">
+      <div class="state-icon red">
+        <svg width="24" height="24" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+          <circle cx="12" cy="12" r="10"/>
+          <line x1="15" y1="9" x2="9" y2="15"/><line x1="9" y1="9" x2="15" y2="15"/>
+        </svg>
+      </div>
+      <p class="state-title">Ничего не найдено</p>
+      <p class="state-desc" id="errorMessage">Груз с таким трек-номером не найден.</p>
+      <a href="/?mode=track" class="state-btn">Новый поиск</a>
+    </div>
+
+    <!-- Table view -->
+    <div id="tableView" class="hidden">
+      <div class="table-wrapper">
+        <div class="table-scroll">
+          <table class="items-table">
+            <thead>
+              <tr>
+                <th class="sortable" data-sort="track_number">Трек-номер <span class="sort-arrow">↕</span></th>
+                <th class="sortable" data-sort="client_id">Клиент <span class="sort-arrow">↕</span></th>
+                <th class="sortable" data-sort="status">Статус <span class="sort-arrow">↕</span></th>
+                <th class="sortable" data-sort="category">Категория <span class="sort-arrow">↕</span></th>
+                <th class="sortable" data-sort="box_number">Коробка <span class="sort-arrow">↕</span></th>
+                <th class="sortable" data-sort="date">Дата <span class="sort-arrow">↕</span></th>
+                <th>Комментарий</th>
+                <th>Фото</th>
+              </tr>
+            </thead>
+            <tbody id="tableBody"></tbody>
+          </table>
+        </div>
+        <div class="table-footer">
+          <span class="table-info" id="tableInfo"></span>
+        </div>
+      </div>
+    </div>
+
+    <!-- Card view -->
+    <div id="gridView" class="hidden">
+      <div class="cards-grid" id="cardsGrid"></div>
+    </div>
+
+  </main>
+
+  <!-- Photo modal -->
+  <div class="modal-overlay hidden" id="photoModal">
+    <div class="modal-inner">
+      <button class="modal-close" id="modalClose">
+        <svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24">
+          <line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>
+        </svg>
+      </button>
+      <img id="modalImg" src="" alt="Фото" />
+    </div>
+  </div>
+
+  <script src="utils.js"></script>
+  <script src="search.js"></script>
+</body>
+</html>

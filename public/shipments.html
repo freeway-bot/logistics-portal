@@ -1,0 +1,137 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Отправки</title>
+  <link rel="stylesheet" href="style.css" />
+  <link rel="stylesheet" href="admin.css" />
+  <style>
+    .status-pills { display: flex; gap: 6px; flex-wrap: wrap; }
+    .status-pill {
+      padding: 5px 12px;
+      border-radius: 20px;
+      font-size: 12px;
+      font-weight: 600;
+      border: 1.5px solid var(--border);
+      background: var(--surface-2);
+      color: var(--text-2);
+      cursor: pointer;
+      transition: all var(--t);
+    }
+    .status-pill:hover  { border-color: var(--primary-bdr); color: var(--primary); background: var(--primary-bg); }
+    .status-pill.active { border-color: var(--primary); background: var(--primary-bg); color: var(--primary); }
+
+    .ship-status {
+      display: inline-block;
+      padding: 3px 9px;
+      border-radius: 20px;
+      font-size: 11px;
+      font-weight: 700;
+      white-space: nowrap;
+    }
+    .ship-status.s-shipped   { background: var(--green-bg);  color: #065f46; }
+    .ship-status.s-transit   { background: #fffbeb;          color: #92400e; }
+    .ship-status.s-delivered { background: var(--primary-bg); color: var(--primary); }
+    .ship-status.s-other     { background: var(--surface-2); color: var(--text-3); }
+
+    .ship-row { cursor: pointer; transition: background var(--t); }
+    .ship-row:hover td { background: var(--surface-2); }
+  </style>
+</head>
+<body>
+
+  <header class="dash-header">
+    <div class="dash-header-inner">
+      <a href="/" class="header-logo">
+        <svg width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+          <path d="M20 7H4a2 2 0 0 0-2 2v6a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V9a2 2 0 0 0-2-2Z"/>
+          <path d="M16 7V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v2"/>
+        </svg>
+        <span>Logistics</span>
+      </a>
+      <nav class="admin-nav">
+        <a href="/admin.html"       class="admin-nav-link">Dashboard</a>
+        <a href="/shipments.html"   class="admin-nav-link active">Отправки</a>
+        <a href="/upload.html"      class="admin-nav-link">Создать отгрузку</a>
+        <a href="/history.html"     class="admin-nav-link">История</a>
+        <a href="/"                 class="admin-nav-link">Клиентский вход</a>
+      </nav>
+      <button class="btn-ghost" id="refreshBtn">
+        <svg width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+          <path d="M23 4v6h-6"/><path d="M1 20v-6h6"/>
+          <path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/>
+        </svg>
+        Обновить
+      </button>
+    </div>
+  </header>
+
+  <main class="page-content">
+
+    <div id="loadingState" class="state-center">
+      <div class="spinner"></div>
+      <p class="state-desc">Загружаем отправки…</p>
+    </div>
+
+    <div id="emptyState" class="state-center hidden">
+      <div class="state-icon gray">
+        <svg width="24" height="24" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+          <path d="M20 7H4a2 2 0 0 0-2 2v6a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V9a2 2 0 0 0-2-2Z"/>
+          <path d="M16 7V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v2"/>
+        </svg>
+      </div>
+      <p class="state-title">Отправок нет</p>
+      <p class="state-desc">Создайте первую отправку через раздел «Создать отгрузку».</p>
+      <a href="/upload.html" class="state-btn" style="display:inline-block;text-decoration:none">Создать отправку</a>
+    </div>
+
+    <div id="content" class="hidden">
+
+      <div class="admin-card" style="padding:0;overflow:hidden">
+        <div style="padding:14px 20px;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:10px">
+          <div style="display:flex;align-items:center;gap:14px;flex-wrap:wrap">
+            <div style="font-size:13px;font-weight:700;text-transform:uppercase;letter-spacing:.4px;color:var(--text)">Отправки</div>
+            <span id="totalLabel" style="font-size:12px;color:var(--text-3)"></span>
+          </div>
+          <div class="status-pills" id="filterPills">
+            <button class="status-pill active" data-status="">Все</button>
+            <button class="status-pill" data-status="отправлено">Отправлено</button>
+            <button class="status-pill" data-status="в пути">В пути</button>
+            <button class="status-pill" data-status="доставлено">Доставлено</button>
+          </div>
+        </div>
+
+        <div class="table-scroll">
+          <table class="items-table">
+            <thead>
+              <tr>
+                <th>ID отправки</th>
+                <th>Код</th>
+                <th>Дата</th>
+                <th style="text-align:center">Треков</th>
+                <th>Вес, кг</th>
+                <th>Объём, м³</th>
+                <th>Оператор</th>
+                <th>Статус</th>
+              </tr>
+            </thead>
+            <tbody id="shipmentsBody"></tbody>
+          </table>
+        </div>
+
+        <div id="pagerWrap" style="padding:12px 20px;border-top:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;font-size:12px;color:var(--text-3);display:none">
+          <button class="btn-ghost" id="prevBtn">← Назад</button>
+          <span id="pageLabel"></span>
+          <button class="btn-ghost" id="nextBtn">Вперёд →</button>
+        </div>
+      </div>
+
+    </div>
+
+  </main>
+
+  <script src="utils.js"></script>
+  <script src="shipments.js"></script>
+</body>
+</html>
