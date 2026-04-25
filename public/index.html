@@ -3,7 +3,10 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Logistics Portal</title>
+  <title>FreewayChina — Личный кабинет</title>
+  <link rel="preconnect" href="https://api.fontshare.com" crossorigin />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link rel="stylesheet" href="style.css" />
 </head>
 <body>
@@ -14,20 +17,22 @@
       <div class="login-logo">
         <div class="login-logo-icon">
           <svg width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.8" viewBox="0 0 24 24">
-            <path d="M20 7H4a2 2 0 0 0-2 2v6a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V9a2 2 0 0 0-2-2Z"/>
-            <path d="M16 7V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v2"/>
+            <path d="M3 17l2-7h14l2 7H3Z"/>
+            <path d="M5 10V7a1 1 0 0 1 1-1h4v4"/>
+            <path d="M14 6h-3v4"/>
+            <circle cx="7.5" cy="17.5" r="1.5"/><circle cx="16.5" cy="17.5" r="1.5"/>
           </svg>
         </div>
-        <span class="login-logo-text">Logistics Portal</span>
+        <span class="login-logo-text">FreewayChina</span>
       </div>
 
       <!-- Mode toggle -->
       <div class="mode-toggle">
-        <button class="mode-btn active" data-mode="client">
+        <button class="mode-btn active" data-mode="login">
           <svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
             <circle cx="12" cy="8" r="4"/><path d="M4 20c0-4 3.6-7 8-7s8 3 8 7"/>
           </svg>
-          Личный кабинет
+          Войти
         </button>
         <button class="mode-btn" data-mode="track">
           <svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
@@ -37,19 +42,33 @@
         </button>
       </div>
 
-      <!-- Client ID form -->
-      <div id="clientPanel">
-        <form id="clientForm" autocomplete="off">
+      <!-- Login form -->
+      <div id="loginPanel">
+        <form id="loginForm" autocomplete="off">
           <div class="form-group">
-            <label class="form-label">ID клиента</label>
-            <input class="input-field" id="clientInput"
-              type="text" placeholder="Например: WAY027"
+            <label class="form-label">ID клиента / Логин</label>
+            <input class="input-field" id="loginInput"
+              type="text" placeholder="Например: 89029 или admin"
               autocorrect="off" autocapitalize="none" spellcheck="false" />
           </div>
-          <button type="submit" class="btn-primary" id="clientBtn">Войти в кабинет</button>
-          <div id="clientError" class="form-error hidden"></div>
+          <div class="form-group">
+            <label class="form-label">Пароль</label>
+            <div style="position:relative">
+              <input class="input-field" id="passwordInput"
+                type="password" placeholder="Введите пароль"
+                autocomplete="current-password" />
+              <button type="button" id="togglePwd" class="btn-toggle-pwd" tabindex="-1" aria-label="Показать пароль">
+                <svg id="eyeIcon" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                  <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/>
+                  <circle cx="12" cy="12" r="3"/>
+                </svg>
+              </button>
+            </div>
+          </div>
+          <button type="submit" class="btn-primary" id="loginBtn">Войти</button>
+          <div id="loginError" class="form-error hidden"></div>
         </form>
-        <p class="form-hint">Войдите по вашему ID для просмотра всех грузов</p>
+        <p class="form-hint">Войдите для просмотра грузов и управления отправками</p>
       </div>
 
       <!-- Track search form -->
@@ -69,6 +88,24 @@
 
     </div>
   </div>
+
+  <style>
+    .login-logo-text {
+      font-family: 'IBM Plex Sans Condensed', 'General Sans', sans-serif;
+      font-size: 20px;
+      font-weight: 700;
+      letter-spacing: -.4px;
+    }
+    .login-card {
+      border-top: 2px solid var(--primary);
+    }
+    .btn-toggle-pwd {
+      position: absolute; right: 10px; top: 50%; transform: translateY(-50%);
+      background: none; border: none; cursor: pointer; color: var(--text-3);
+      padding: 4px; display: flex; align-items: center;
+    }
+    .btn-toggle-pwd:hover { color: var(--text-2); }
+  </style>
 
   <script src="login.js"></script>
 </body>

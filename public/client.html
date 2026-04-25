@@ -1,0 +1,385 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>FreewayChina — Портал клиента</title>
+  <link rel="preconnect" href="https://api.fontshare.com" crossorigin />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link rel="stylesheet" href="style.css" />
+  <style>
+    .client-hero {
+      background: radial-gradient(ellipse 140% 70% at 50% -10%, rgba(46,134,222,.13) 0%, transparent 60%), var(--bg);
+      min-height: 100vh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 24px;
+    }
+
+    .client-card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-top: 3px solid var(--primary);
+      border-radius: 16px;
+      box-shadow: var(--shadow-lg);
+      width: 100%;
+      max-width: 420px;
+      overflow: hidden;
+    }
+
+    .client-card-top {
+      padding: 32px 32px 24px;
+      text-align: center;
+    }
+
+    .client-card-icon {
+      width: 52px;
+      height: 52px;
+      background: var(--primary-bg);
+      border: 1.5px solid var(--primary-bdr);
+      border-radius: 14px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      margin: 0 auto 14px;
+      color: var(--primary);
+    }
+
+    .client-card-title {
+      font-family: 'IBM Plex Sans Condensed', 'General Sans', sans-serif;
+      color: var(--text);
+      font-size: 22px;
+      font-weight: 700;
+      margin: 0 0 4px;
+      letter-spacing: -0.4px;
+    }
+
+    .client-card-sub {
+      color: var(--text-3);
+      font-size: 13px;
+      margin: 0;
+    }
+
+    .client-card-body {
+      padding: 8px 32px 32px;
+    }
+
+    .client-tabs {
+      display: flex;
+      gap: 0;
+      border-radius: 8px;
+      background: var(--surface-2);
+      border: 1px solid var(--border);
+      padding: 3px;
+      margin-bottom: 24px;
+    }
+
+    .client-tab {
+      flex: 1;
+      padding: 7px 0;
+      border: none;
+      background: none;
+      border-radius: 6px;
+      font-size: 13px;
+      font-weight: 500;
+      color: var(--text-3);
+      cursor: pointer;
+      transition: all .15s;
+    }
+
+    .client-tab.active {
+      background: var(--surface);
+      color: var(--text);
+      font-weight: 600;
+      box-shadow: var(--shadow-sm);
+    }
+
+    .client-form-label {
+      display: block;
+      font-size: 12px;
+      font-weight: 600;
+      color: var(--text-2);
+      margin-bottom: 6px;
+      text-transform: uppercase;
+      letter-spacing: 0.4px;
+    }
+
+    .client-input {
+      width: 100%;
+      padding: 11px 14px;
+      border: 1.5px solid var(--border);
+      border-radius: 8px;
+      font-size: 15px;
+      font-family: inherit;
+      outline: none;
+      transition: border-color .15s, box-shadow .15s;
+      box-sizing: border-box;
+      background: var(--surface-2);
+      color: var(--text);
+    }
+
+    .client-input:focus {
+      border-color: var(--primary);
+      background: var(--surface);
+      box-shadow: 0 0 0 3px rgba(46,134,222,.14);
+    }
+
+    .client-btn {
+      width: 100%;
+      padding: 12px;
+      background: var(--primary);
+      color: #fff;
+      border: none;
+      border-radius: 8px;
+      font-size: 15px;
+      font-weight: 600;
+      font-family: inherit;
+      cursor: pointer;
+      margin-top: 8px;
+      transition: background .15s, box-shadow .15s, transform .1s;
+      letter-spacing: 0.2px;
+      box-shadow: 0 2px 10px rgba(46,134,222,.35);
+    }
+
+    .client-btn:hover:not(:disabled) { background: var(--primary-h); box-shadow: 0 4px 18px rgba(46,134,222,.5); }
+    .client-btn:active:not(:disabled) { transform: scale(0.99); }
+    .client-btn:disabled { opacity: 0.6; cursor: not-allowed; }
+
+    .client-error {
+      background: var(--red-bg);
+      border: 1px solid rgba(214,58,71,.25);
+      color: var(--red);
+      border-radius: 7px;
+      padding: 9px 12px;
+      font-size: 13px;
+      margin-top: 10px;
+      display: none;
+    }
+
+    .client-hint {
+      text-align: center;
+      font-size: 12px;
+      color: var(--text-3);
+      margin-top: 16px;
+    }
+
+    .client-footer {
+      border-top: 1px solid var(--border);
+      padding: 14px 32px;
+      text-align: center;
+      font-size: 12px;
+      color: var(--text-3);
+      background: var(--surface-2);
+    }
+
+    .client-footer a {
+      color: var(--primary);
+      text-decoration: none;
+      font-weight: 500;
+    }
+
+    .pw-wrap { position: relative; }
+    .pw-toggle {
+      position: absolute; right: 12px; top: 50%; transform: translateY(-50%);
+      background: none; border: none; cursor: pointer;
+      color: var(--text-3); padding: 2px; display: flex;
+    }
+    .pw-toggle:hover { color: var(--text-2); }
+
+    @media (max-width: 480px) {
+      .client-card-body { padding: 8px 20px 24px; }
+      .client-card-top  { padding: 24px 20px 20px; }
+      .client-footer    { padding: 12px 20px; }
+    }
+  </style>
+</head>
+<body style="margin:0;padding:0">
+  <div class="client-hero">
+    <div class="client-card">
+
+      <!-- Header -->
+      <div class="client-card-top">
+        <div class="client-card-icon">
+          <svg width="26" height="26" fill="none" stroke="currentColor" stroke-width="1.8" viewBox="0 0 24 24">
+            <path d="M3 17l2-7h14l2 7H3Z"/>
+            <path d="M5 10V7a1 1 0 0 1 1-1h4v4"/>
+            <path d="M14 6h-3v4"/>
+            <circle cx="7.5" cy="17.5" r="1.5"/><circle cx="16.5" cy="17.5" r="1.5"/>
+          </svg>
+        </div>
+        <h1 class="client-card-title">FreewayChina</h1>
+        <p class="client-card-sub">Личный кабинет клиента</p>
+      </div>
+
+      <!-- Body -->
+      <div class="client-card-body">
+
+        <!-- Tabs -->
+        <div class="client-tabs">
+          <button class="client-tab active" data-tab="login">
+            Личный кабинет
+          </button>
+          <button class="client-tab" data-tab="track">
+            Поиск по треку
+          </button>
+        </div>
+
+        <!-- Login form -->
+        <div id="loginPanel">
+          <form id="loginForm" autocomplete="off">
+            <div style="margin-bottom:14px">
+              <label class="client-form-label">ID клиента</label>
+              <input class="client-input" id="loginInput"
+                type="text" placeholder="Например: 89029"
+                autocorrect="off" autocapitalize="characters" spellcheck="false" />
+            </div>
+            <div>
+              <label class="client-form-label">Пароль</label>
+              <div class="pw-wrap">
+                <input class="client-input" id="passwordInput"
+                  type="password" placeholder="Введите пароль"
+                  autocomplete="current-password" style="padding-right:40px"/>
+                <button type="button" class="pw-toggle" id="pwToggle">
+                  <svg id="eyeIcon" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                    <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/>
+                    <circle cx="12" cy="12" r="3"/>
+                  </svg>
+                </button>
+              </div>
+            </div>
+            <div class="client-error" id="loginError"></div>
+            <button type="submit" class="client-btn" id="loginBtn">Войти в кабинет</button>
+          </form>
+          <p class="client-hint">Войдите для просмотра всех ваших грузов</p>
+        </div>
+
+        <!-- Track search form -->
+        <div id="trackPanel" style="display:none">
+          <form id="trackForm" autocomplete="off">
+            <div>
+              <label class="client-form-label">Трек-номер</label>
+              <input class="client-input" id="trackInput"
+                type="text" placeholder="Введите трек-номер"
+                autocorrect="off" autocapitalize="none" spellcheck="false"/>
+            </div>
+            <div class="client-error" id="trackError"></div>
+            <button type="submit" class="client-btn" id="trackBtn">Найти груз</button>
+          </form>
+          <p class="client-hint">Поиск по трек-номеру без входа в систему</p>
+        </div>
+
+      </div><!-- /body -->
+
+      <div class="client-footer">
+        Сотрудник? <a href="/index.html">Войти в панель управления →</a>
+      </div>
+
+    </div>
+  </div>
+
+  <script>
+    // ── Tab toggle
+    document.querySelectorAll('.client-tab').forEach(btn => {
+      btn.addEventListener('click', () => {
+        document.querySelectorAll('.client-tab').forEach(b => b.classList.remove('active'));
+        btn.classList.add('active');
+        const tab = btn.dataset.tab;
+        document.getElementById('loginPanel').style.display = tab === 'login' ? '' : 'none';
+        document.getElementById('trackPanel').style.display = tab === 'track' ? '' : 'none';
+        clearErrors();
+        if (tab === 'login') document.getElementById('loginInput').focus();
+        else document.getElementById('trackInput').focus();
+      });
+    });
+
+    window.addEventListener('DOMContentLoaded', () => {
+      document.getElementById('loginInput').focus();
+      if (new URLSearchParams(location.search).get('tab') === 'track') {
+        document.querySelector('[data-tab="track"]').click();
+      }
+    });
+
+    // ── Password toggle
+    document.getElementById('pwToggle').addEventListener('click', () => {
+      const inp  = document.getElementById('passwordInput');
+      const icon = document.getElementById('eyeIcon');
+      const show = inp.type === 'password';
+      inp.type = show ? 'text' : 'password';
+      icon.innerHTML = show
+        ? '<path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24"/><line x1="1" y1="1" x2="23" y2="23"/>'
+        : '<path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/>';
+    });
+
+    // ── Login form
+    document.getElementById('loginForm').addEventListener('submit', async e => {
+      e.preventDefault();
+      const login    = document.getElementById('loginInput').value.trim();
+      const password = document.getElementById('passwordInput').value;
+      const errEl    = document.getElementById('loginError');
+      const btn      = document.getElementById('loginBtn');
+
+      if (!login)    return showErr(errEl, 'Введите ваш Client ID');
+      if (!password) return showErr(errEl, 'Введите пароль');
+
+      btn.disabled = true; btn.textContent = 'Проверяем…';
+      hideErr(errEl);
+
+      try {
+        const res  = await fetch('/api/auth/login', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ login, password }),
+        });
+        const data = await res.json();
+        if (!res.ok) return showErr(errEl, data.error || 'Неверный ID или пароль');
+        const role = data.user?.role;
+        if (role === 'client')        window.location.href = '/dashboard.html';
+        else if (role === 'employee') window.location.href = '/shipments.html';
+        else if (role === 'admin')    window.location.href = '/admin.html';
+        else                          window.location.href = '/dashboard.html';
+      } catch {
+        showErr(errEl, 'Нет соединения с сервером');
+      } finally {
+        btn.disabled = false; btn.textContent = 'Войти в кабинет';
+      }
+    });
+
+    document.getElementById('loginInput').addEventListener('input', () => {
+      hideErr(document.getElementById('loginError'));
+    });
+
+    // ── Track form
+    document.getElementById('trackForm').addEventListener('submit', async e => {
+      e.preventDefault();
+      const track = document.getElementById('trackInput').value.trim();
+      const errEl = document.getElementById('trackError');
+      const btn   = document.getElementById('trackBtn');
+      if (!track)           return showErr(errEl, 'Введите трек-номер');
+      if (track.length < 3) return showErr(errEl, 'Минимум 3 символа');
+
+      btn.disabled = true; btn.textContent = 'Ищем…';
+      hideErr(errEl);
+
+      try {
+        const res  = await fetch(`/api/search?track=${encodeURIComponent(track)}`);
+        const data = await res.json();
+        if (!res.ok || data.total === 0) return showErr(errEl, data.error || 'Ничего не найдено');
+        window.location.href = `/search.html?track=${encodeURIComponent(track)}`;
+      } catch {
+        showErr(errEl, 'Нет соединения с сервером');
+      } finally {
+        btn.disabled = false; btn.textContent = 'Найти груз';
+      }
+    });
+
+    function showErr(el, msg) { el.textContent = msg; el.style.display = 'block'; }
+    function hideErr(el)      { el.style.display = 'none'; }
+    function clearErrors()    {
+      hideErr(document.getElementById('loginError'));
+      hideErr(document.getElementById('trackError'));
+    }
+  </script>
+</body>
+</html>

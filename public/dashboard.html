@@ -3,9 +3,422 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Личный кабинет</title>
+  <title>FreewayChina — Кабинет клиента</title>
+  <link rel="preconnect" href="https://api.fontshare.com" crossorigin />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link rel="stylesheet" href="style.css" />
   <script src="https://cdn.sheetjs.com/xlsx-0.20.3/package/dist/xlsx.mini.min.js"></script>
+  <style>
+    .section-tabs {
+      display: flex;
+      gap: 4px;
+      margin-bottom: 20px;
+      border-bottom: 2px solid var(--border, #e5e7eb);
+      padding-bottom: 0;
+    }
+    .section-tab {
+      display: flex;
+      align-items: center;
+      gap: 7px;
+      padding: 9px 18px 11px;
+      border: none;
+      background: none;
+      font-size: 14px;
+      font-weight: 500;
+      color: var(--text-3, #9ca3af);
+      cursor: pointer;
+      border-bottom: 2px solid transparent;
+      margin-bottom: -2px;
+      transition: color .15s;
+    }
+    .section-tab:hover { color: var(--text, #0C1528); }
+    .section-tab.active {
+      color: var(--primary, #2E86DE);
+      border-bottom-color: var(--primary, #2E86DE);
+      font-weight: 600;
+    }
+    .section-tab-count {
+      background: var(--surface-2, #F7F9FC);
+      color: var(--text-2, #44506E);
+      border-radius: 10px;
+      padding: 1px 7px;
+      font-size: 12px;
+      font-weight: 600;
+    }
+    .section-tab.active .section-tab-count {
+      background: var(--primary-bg, #EBF4FF);
+      color: var(--primary-h, #1A70C4);
+    }
+    /* ── Cargo summary strip ─────────────────────────── */
+    .cargo-summary {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 12px;
+      margin-bottom: 20px;
+    }
+    @media (max-width: 600px) { .cargo-summary { grid-template-columns: repeat(2,1fr); } }
+    .csum-card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 14px 16px;
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      box-shadow: var(--shadow);
+      transition: border-color .15s, box-shadow .15s;
+    }
+    .csum-card:hover { border-color: var(--primary-bdr); box-shadow: var(--shadow-md); }
+    .csum-icon {
+      width: 40px; height: 40px;
+      border-radius: 10px;
+      display: flex; align-items: center; justify-content: center;
+      flex-shrink: 0;
+    }
+    .csum-icon.blue   { background: var(--primary-bg); color: var(--primary); }
+    .csum-icon.green  { background: var(--green-bg);   color: var(--green); }
+    .csum-icon.amber  { background: var(--amber-bg);   color: var(--amber); }
+    .csum-icon.purple { background: var(--purple-bg);  color: var(--purple); }
+    .csum-val   { font-size: 22px; font-weight: 700; font-family: 'IBM Plex Sans Condensed', sans-serif; color: var(--text); line-height: 1.1; letter-spacing: -.3px; }
+    .csum-label { font-size: 11px; color: var(--text-3); margin-top: 2px; font-weight: 500; text-transform: uppercase; letter-spacing: .4px; }
+
+    /* ── Cargo controls bar ──────────────────────────── */
+    .cargo-controls {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-lg);
+      padding: 10px 14px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      margin-bottom: 14px;
+      flex-wrap: wrap;
+      box-shadow: var(--shadow);
+    }
+    .cargo-search {
+      position: relative;
+      flex: 1;
+      min-width: 180px;
+      max-width: 320px;
+    }
+    .cargo-search svg {
+      position: absolute; left: 10px; top: 50%; transform: translateY(-50%);
+      color: var(--text-3); pointer-events: none;
+    }
+    .cargo-search input {
+      width: 100%;
+      padding: 8px 11px 8px 32px;
+      border: 1.5px solid var(--border);
+      border-radius: var(--radius-sm);
+      font-size: 13px; color: var(--text);
+      background: var(--surface-2);
+      outline: none;
+      transition: border-color .15s, box-shadow .15s;
+    }
+    .cargo-search input:focus {
+      border-color: var(--primary); background: var(--surface);
+      box-shadow: 0 0 0 3px rgba(46,134,222,.14);
+    }
+    .cc-sep { width: 1px; height: 22px; background: var(--border); flex-shrink: 0; }
+
+    /* ── Cargo filter tabs ───────────────────────────── */
+    .cargo-filter {
+      display: flex; gap: 4px;
+      flex-shrink: 0; flex-wrap: wrap;
+    }
+    .cargo-ftab {
+      display: flex; align-items: center; gap: 6px;
+      padding: 7px 13px;
+      border: 1.5px solid var(--border);
+      border-radius: var(--radius-sm);
+      background: var(--surface-2);
+      font-size: 13px; font-weight: 500;
+      color: var(--text-2);
+      cursor: pointer; transition: all .15s;
+    }
+    .cargo-ftab svg { flex-shrink: 0; opacity: .8; }
+    .cargo-ftab:hover { border-color: var(--primary-bdr); color: var(--primary); background: var(--primary-bg); }
+    .cargo-ftab.active { background: var(--primary); border-color: var(--primary); color: #fff; box-shadow: 0 2px 8px rgba(46,134,222,.3); }
+    .cargo-ftab.active svg { opacity: 1; }
+    .cargo-ftab .cf-cnt {
+      padding: 1px 6px; border-radius: 10px;
+      font-size: 11px; font-weight: 700;
+      background: rgba(0,0,0,.06); color: var(--text-2);
+      font-variant-numeric: tabular-nums;
+    }
+    .cargo-ftab.active .cf-cnt { background: rgba(255,255,255,.25); color: #fff; }
+
+    .cargo-sort {
+      padding: 7px 10px;
+      border: 1.5px solid var(--border);
+      border-radius: var(--radius-sm);
+      font-size: 13px; color: var(--text-2);
+      background: var(--surface-2);
+      outline: none; cursor: pointer;
+      transition: border-color .15s;
+    }
+    .cargo-sort:focus { border-color: var(--primary); }
+
+    .cargo-export {
+      display: flex; align-items: center; gap: 6px;
+      padding: 7px 13px;
+      border: 1.5px solid var(--border);
+      border-radius: var(--radius-sm);
+      background: var(--surface-2);
+      color: var(--text-2);
+      font-size: 13px; font-weight: 500;
+      cursor: pointer;
+      transition: all .15s;
+    }
+    .cargo-export:hover { border-color: var(--green); color: var(--green); background: var(--green-bg); }
+
+    /* ── Month group ─────────────────────────────────── */
+    .month-group { margin-bottom: 24px; }
+    .month-group:last-child { margin-bottom: 0; }
+    .month-head {
+      display: flex; align-items: baseline; justify-content: space-between;
+      padding: 0 4px 10px;
+      margin-bottom: 12px;
+      border-bottom: 1px solid var(--border);
+    }
+    .month-title {
+      font-family: 'IBM Plex Sans Condensed', sans-serif;
+      font-size: 16px; font-weight: 600;
+      color: var(--text);
+      letter-spacing: -.2px;
+    }
+    .month-stats {
+      font-size: 12px; color: var(--text-3); font-weight: 500;
+      font-variant-numeric: tabular-nums;
+    }
+    .month-stats strong { color: var(--text-2); font-weight: 600; }
+
+    /* ── Cargo cards grid ────────────────────────────── */
+    .cargo-cards {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+      gap: 14px;
+    }
+    @media (max-width: 480px) { .cargo-cards { grid-template-columns: 1fr; } }
+
+    .cargo-card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 14px;
+      overflow: hidden;
+      border-left: 4px solid var(--border);
+      transition: box-shadow .2s, transform .15s, border-color .15s;
+      box-shadow: var(--shadow);
+      cursor: pointer;
+      text-decoration: none;
+      color: inherit;
+      display: flex; flex-direction: column;
+    }
+    .cargo-card:hover {
+      box-shadow: var(--shadow-md);
+      transform: translateY(-2px);
+      border-color: var(--primary-bdr);
+    }
+    .cargo-card.delivered { border-left-color: var(--green); }
+    .cargo-card.transit   { border-left-color: var(--primary); }
+    .cargo-card.warehouse { border-left-color: var(--amber); }
+
+    .cc-head {
+      padding: 14px 16px 8px;
+      display: flex; align-items: flex-start; justify-content: space-between; gap: 8px;
+    }
+    .cc-number-wrap {
+      display: flex; align-items: center; gap: 6px;
+      min-width: 0; flex: 1;
+    }
+    .cc-number {
+      font-family: 'JetBrains Mono', 'IBM Plex Mono', 'Courier New', monospace;
+      font-size: 14px; font-weight: 600;
+      color: var(--text);
+      letter-spacing: -.2px;
+      white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+    }
+    .cc-copy {
+      flex-shrink: 0;
+      width: 24px; height: 24px;
+      display: flex; align-items: center; justify-content: center;
+      border: 1px solid var(--border);
+      border-radius: 5px;
+      background: transparent;
+      color: var(--text-3);
+      opacity: 0;
+      transition: all .15s;
+    }
+    .cargo-card:hover .cc-copy { opacity: 1; }
+    .cc-copy:hover { background: var(--primary-bg); color: var(--primary); border-color: var(--primary-bdr); }
+    .cc-copy.copied { background: var(--green-bg); color: var(--green); border-color: rgba(15,169,110,.3); opacity: 1; }
+
+    .cc-badge {
+      flex-shrink: 0;
+      padding: 3px 9px;
+      border-radius: 20px;
+      font-size: 11px; font-weight: 700;
+      text-transform: uppercase; letter-spacing: .3px;
+      background: var(--surface-2);
+      color: var(--text-2);
+    }
+    .cc-badge.delivered { background: var(--green-bg); color: #087A51; }
+    .cc-badge.transit   { background: var(--primary-bg); color: var(--primary-h); }
+    .cc-badge.warehouse { background: var(--amber-bg); color: #A86100; }
+
+    .cc-meta {
+      padding: 0 16px 12px;
+      display: flex; align-items: center; gap: 8px;
+      font-size: 12px; color: var(--text-3);
+    }
+    .cc-meta-dot { color: var(--border); }
+    .cc-cat-tag {
+      background: var(--surface-2);
+      border: 1px solid var(--border-light);
+      border-radius: 4px;
+      padding: 1px 7px;
+      font-size: 11px; font-weight: 500;
+      color: var(--text-2);
+    }
+
+    /* Status timeline */
+    .cc-timeline {
+      margin: 0 16px 12px;
+      display: flex; align-items: center; gap: 4px;
+    }
+    .cc-tl-step {
+      flex: 1;
+      height: 4px;
+      border-radius: 2px;
+      background: var(--border);
+      transition: background .15s;
+    }
+    .cc-tl-step.done { background: var(--green); }
+    .cc-tl-step.active { background: var(--primary); }
+    .cc-tl-step.warehouse-active { background: var(--amber); }
+    .cc-tl-labels {
+      display: flex; justify-content: space-between;
+      margin: 4px 16px 12px;
+      font-size: 9.5px;
+      color: var(--text-3);
+      text-transform: uppercase;
+      letter-spacing: .4px;
+      font-weight: 500;
+    }
+
+    .cc-metrics {
+      margin: 0 16px 12px;
+      display: grid; grid-template-columns: repeat(3,1fr);
+      background: var(--surface-2);
+      border-radius: 10px;
+      overflow: hidden;
+      border: 1px solid var(--border);
+    }
+    .cc-metric {
+      padding: 10px 8px;
+      text-align: center;
+      border-right: 1px solid var(--border);
+    }
+    .cc-metric:last-child { border-right: none; }
+    .cc-m-val  { display: block; font-size: 17px; font-weight: 700; font-family: 'IBM Plex Sans Condensed', sans-serif; color: var(--text); line-height: 1.1; font-variant-numeric: tabular-nums; }
+    .cc-m-lbl  { display: block; font-size: 10px; color: var(--text-3); margin-top: 3px; font-weight: 500; text-transform: uppercase; letter-spacing: .3px; }
+
+    .cc-efficiency {
+      margin: 0 16px 12px;
+      display: flex; justify-content: space-between; align-items: center;
+      padding: 7px 11px;
+      background: var(--surface-2);
+      border: 1px dashed var(--border);
+      border-radius: 8px;
+      font-size: 11.5px;
+      color: var(--text-2);
+      font-variant-numeric: tabular-nums;
+    }
+    .cc-eff-item { display: flex; align-items: center; gap: 5px; }
+    .cc-eff-item strong { color: var(--text); font-weight: 600; }
+    .cc-eff-sep { color: var(--border); }
+
+    .cc-cost {
+      padding: 0 16px 14px;
+    }
+    .cc-cost-row {
+      display: flex; justify-content: space-between; align-items: center;
+      padding: 3px 0;
+      font-size: 12px;
+      color: var(--text-2);
+      font-variant-numeric: tabular-nums;
+    }
+    .cc-cost-row.dim { color: var(--text-3); font-size: 11px; }
+    .cc-cost-divider {
+      height: 1px; background: var(--border-light);
+      margin: 6px 0;
+    }
+    .cc-cost-total {
+      display: flex; justify-content: space-between; align-items: center;
+      padding: 8px 12px;
+      background: var(--green-bg);
+      border: 1px solid rgba(15,169,110,.18);
+      border-radius: 9px;
+      margin-top: 4px;
+    }
+    .cc-cost-total-lbl { font-size: 13px; font-weight: 600; color: #087A51; }
+    .cc-cost-total-val { font-size: 18px; font-weight: 800; font-family: 'IBM Plex Sans Condensed', sans-serif; color: var(--green); font-variant-numeric: tabular-nums; }
+
+    .cc-arrival {
+      padding: 9px 16px;
+      border-top: 1px solid var(--border-light);
+      background: var(--surface-2);
+      display: flex; align-items: center; gap: 6px;
+      font-size: 11.5px; color: var(--text-2);
+      margin-top: auto;
+    }
+    .cc-arrival svg { flex-shrink: 0; color: var(--text-3); }
+    .cc-arrival.delivered { color: #087A51; }
+    .cc-arrival.delivered svg { color: var(--green); }
+    .cc-arrival.transit-soon { color: var(--primary-h); background: var(--primary-bg); }
+    .cc-arrival.transit-soon svg { color: var(--primary); }
+    .cc-arrival.overdue { color: var(--red); background: var(--red-bg); }
+    .cc-arrival.overdue svg { color: var(--red); }
+    .cc-arrival strong { font-weight: 600; }
+
+    /* Empty filter state */
+    .cargo-empty-filter {
+      grid-column: 1 / -1;
+      text-align: center;
+      padding: 48px 20px;
+      background: var(--surface);
+      border: 1px dashed var(--border);
+      border-radius: var(--radius-lg);
+    }
+    .cargo-empty-filter svg { color: var(--text-3); margin-bottom: 10px; }
+    .cargo-empty-filter p { color: var(--text-2); font-size: 14px; margin-bottom: 14px; }
+    .cargo-empty-filter button {
+      padding: 8px 18px;
+      border: 1.5px solid var(--primary);
+      background: var(--primary-bg);
+      color: var(--primary);
+      border-radius: var(--radius-sm);
+      font-size: 13px; font-weight: 600;
+      cursor: pointer;
+      transition: all .15s;
+    }
+    .cargo-empty-filter button:hover { background: var(--primary); color: #fff; }
+
+    /* Skeleton card */
+    .cargo-skel {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 14px;
+      padding: 16px;
+      box-shadow: var(--shadow);
+    }
+    .cargo-skel .skel { height: 12px; margin-bottom: 10px; }
+    .cargo-skel .skel-1 { width: 65%; height: 16px; }
+    .cargo-skel .skel-2 { width: 40%; }
+    .cargo-skel .skel-3 { width: 100%; height: 56px; margin-top: 14px; }
+    .cargo-skel .skel-4 { width: 100%; height: 32px; margin-top: 14px; }
+  </style>
 </head>
 <body>
 
@@ -13,10 +426,12 @@
     <div class="dash-header-inner">
       <a href="/" class="header-logo">
         <svg width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
-          <path d="M20 7H4a2 2 0 0 0-2 2v6a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V9a2 2 0 0 0-2-2Z"/>
-          <path d="M16 7V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v2"/>
+          <path d="M3 17l2-7h14l2 7H3Z"/>
+          <path d="M5 10V7a1 1 0 0 1 1-1h4v4"/>
+          <path d="M14 6h-3v4"/>
+          <circle cx="7.5" cy="17.5" r="1.5"/><circle cx="16.5" cy="17.5" r="1.5"/>
         </svg>
-        <span>Мои грузы</span>
+        <span style="font-family:'IBM Plex Sans Condensed',sans-serif;font-weight:700;letter-spacing:-.3px;">FreewayChina</span>
       </a>
       <div class="header-right">
         <div class="client-badge">
@@ -31,6 +446,28 @@
   </header>
 
   <main class="page-content">
+
+    <!-- Section switcher -->
+    <div class="section-tabs">
+      <button class="section-tab active" data-section="parcels">
+        <svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+          <path d="M20 7H4a2 2 0 0 0-2 2v6a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V9a2 2 0 0 0-2-2Z"/>
+          <path d="M16 7V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v2"/>
+        </svg>
+        Посылки <span class="section-tab-count" id="stcParcels">0</span>
+      </button>
+      <button class="section-tab" data-section="shipments">
+        <svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+          <rect x="1" y="3" width="15" height="13" rx="1"/>
+          <path d="M16 8h4l3 4v4h-7V8z"/>
+          <circle cx="5.5" cy="18.5" r="2.5"/><circle cx="18.5" cy="18.5" r="2.5"/>
+        </svg>
+        Грузы <span class="section-tab-count" id="stcShipments">0</span>
+      </button>
+    </div>
+
+    <!-- Section: Посылки -->
+    <div id="parcelsSection">
 
     <!-- Stats -->
     <div class="stats-row">
@@ -229,6 +666,166 @@
         <div class="pagination" id="paginationCards"></div>
       </div>
     </div>
+
+    </div><!-- /parcelsSection -->
+
+    <!-- Section: Грузы (Логистика) -->
+    <div id="shipmentsSection" class="hidden">
+
+      <!-- Skeleton loading -->
+      <div id="shipLoadingState">
+        <div class="cargo-summary">
+          <div class="cargo-skel"><div class="skel skel-1"></div><div class="skel skel-2"></div></div>
+          <div class="cargo-skel"><div class="skel skel-1"></div><div class="skel skel-2"></div></div>
+          <div class="cargo-skel"><div class="skel skel-1"></div><div class="skel skel-2"></div></div>
+          <div class="cargo-skel"><div class="skel skel-1"></div><div class="skel skel-2"></div></div>
+        </div>
+        <div class="cargo-cards" style="margin-top:14px">
+          <div class="cargo-skel"><div class="skel skel-1"></div><div class="skel skel-2"></div><div class="skel skel-3"></div><div class="skel skel-4"></div></div>
+          <div class="cargo-skel"><div class="skel skel-1"></div><div class="skel skel-2"></div><div class="skel skel-3"></div><div class="skel skel-4"></div></div>
+          <div class="cargo-skel"><div class="skel skel-1"></div><div class="skel skel-2"></div><div class="skel skel-3"></div><div class="skel skel-4"></div></div>
+        </div>
+      </div>
+
+      <!-- Error -->
+      <div id="shipErrorState" class="state-center hidden">
+        <div class="state-icon red">
+          <svg width="24" height="24" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+            <circle cx="12" cy="12" r="10"/>
+            <line x1="15" y1="9" x2="9" y2="15"/><line x1="9" y1="9" x2="15" y2="15"/>
+          </svg>
+        </div>
+        <p class="state-title">Ошибка загрузки</p>
+        <p class="state-desc" id="shipErrorMsg"></p>
+        <button class="state-btn" onclick="loadShipments()">Попробовать снова</button>
+      </div>
+
+      <!-- Empty -->
+      <div id="shipEmptyState" class="state-center hidden">
+        <div class="state-icon gray">
+          <svg width="24" height="24" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+            <rect x="1" y="3" width="15" height="13" rx="1"/>
+            <path d="M16 8h4l3 4v4h-7V8z"/>
+            <circle cx="5.5" cy="18.5" r="2.5"/><circle cx="18.5" cy="18.5" r="2.5"/>
+          </svg>
+        </div>
+        <p class="state-title">Грузов пока нет</p>
+        <p class="state-desc">Данные появятся после первой отгрузки</p>
+      </div>
+
+      <!-- Content -->
+      <div id="shipContent" class="hidden">
+
+        <!-- Summary strip -->
+        <div class="cargo-summary">
+          <div class="csum-card">
+            <div class="csum-icon blue">
+              <svg width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                <path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/>
+                <polyline points="3.27 6.96 12 12.01 20.73 6.96"/><line x1="12" y1="22.08" x2="12" y2="12"/>
+              </svg>
+            </div>
+            <div><div class="csum-val" id="sSum_count">0</div><div class="csum-label">Грузов</div></div>
+          </div>
+          <div class="csum-card">
+            <div class="csum-icon amber">
+              <svg width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                <path d="M6.5 6.5h11l1.5 13.5a1 1 0 0 1-1 1.1H6a1 1 0 0 1-1-1.1L6.5 6.5Z"/>
+                <path d="M9 6.5V5a3 3 0 0 1 6 0v1.5"/><line x1="3" y1="11" x2="21" y2="11"/>
+              </svg>
+            </div>
+            <div><div class="csum-val" id="sSum_weight">0</div><div class="csum-label">кг общий вес</div></div>
+          </div>
+          <div class="csum-card">
+            <div class="csum-icon purple">
+              <svg width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                <path d="M21 16.5l-9 5-9-5V7.5l9-5 9 5v9Z"/>
+                <polyline points="3.27 7.5 12 12.5 20.73 7.5"/><line x1="12" y1="22" x2="12" y2="12.5"/>
+              </svg>
+            </div>
+            <div><div class="csum-val" id="sSum_volume">0</div><div class="csum-label">м³ общий объём</div></div>
+          </div>
+          <div class="csum-card">
+            <div class="csum-icon green">
+              <svg width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                <line x1="12" y1="1" x2="12" y2="23"/>
+                <path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/>
+              </svg>
+            </div>
+            <div><div class="csum-val" id="sSum_total">$0</div><div class="csum-label">итого стоимость</div></div>
+          </div>
+        </div>
+
+        <!-- Controls -->
+        <div class="cargo-controls">
+          <div class="cargo-search">
+            <svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+              <circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/>
+            </svg>
+            <input type="text" id="cargoSearch" placeholder="Поиск по номеру груза…" />
+          </div>
+
+          <div class="cc-sep"></div>
+
+          <div class="cargo-filter">
+            <button class="cargo-ftab active" data-cf="all">
+              <svg width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                <rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/>
+                <rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/>
+              </svg>
+              Все <span class="cf-cnt" id="cf_all">0</span>
+            </button>
+            <button class="cargo-ftab" data-cf="transit">
+              <svg width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                <rect x="1" y="3" width="15" height="13" rx="1"/>
+                <path d="M16 8h4l3 4v4h-7V8z"/>
+                <circle cx="5.5" cy="18.5" r="2.5"/><circle cx="18.5" cy="18.5" r="2.5"/>
+              </svg>
+              В пути <span class="cf-cnt" id="cf_transit">0</span>
+            </button>
+            <button class="cargo-ftab" data-cf="delivered">
+              <svg width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                <polyline points="20 6 9 17 4 12"/>
+              </svg>
+              Доставлено <span class="cf-cnt" id="cf_delivered">0</span>
+            </button>
+          </div>
+
+          <div class="cc-sep"></div>
+
+          <select class="cargo-sort" id="cargoSort">
+            <option value="date_desc">Дата ↓ новые</option>
+            <option value="date_asc">Дата ↑ старые</option>
+            <option value="total_desc">Стоимость ↓</option>
+            <option value="total_asc">Стоимость ↑</option>
+            <option value="weight_desc">Вес ↓</option>
+            <option value="weight_asc">Вес ↑</option>
+            <option value="volume_desc">Объём ↓</option>
+          </select>
+
+          <select class="cargo-sort" id="cargoPeriod">
+            <option value="all">Весь период</option>
+            <option value="month">Этот месяц</option>
+            <option value="quarter">Квартал</option>
+            <option value="year">Этот год</option>
+          </select>
+
+          <button class="cargo-export" id="cargoExportBtn">
+            <svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+              <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
+              <polyline points="7 10 12 15 17 10"/>
+              <line x1="12" y1="15" x2="12" y2="3"/>
+            </svg>
+            CSV
+          </button>
+        </div>
+
+        <!-- Cards (grouped by month) -->
+        <div id="cargoGroupsContainer"></div>
+
+      </div><!-- /shipContent -->
+
+    </div><!-- /shipmentsSection -->
 
   </main>
 

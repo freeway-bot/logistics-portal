@@ -1,0 +1,295 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Детали груза — FreewayChina</title>
+  <link rel="preconnect" href="https://api.fontshare.com" crossorigin />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link rel="stylesheet" href="style.css" />
+  <style>
+    .detail-page { max-width: 980px; margin: 0 auto; padding: 24px; }
+
+    .back-link {
+      display: inline-flex; align-items: center; gap: 6px;
+      color: var(--text-2); text-decoration: none;
+      font-size: 13px; font-weight: 500;
+      margin-bottom: 16px;
+      transition: color .15s;
+    }
+    .back-link:hover { color: var(--primary); }
+
+    .detail-hero {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-left: 5px solid var(--border);
+      border-radius: var(--radius-lg);
+      padding: 24px 28px;
+      box-shadow: var(--shadow);
+      margin-bottom: 18px;
+    }
+    .detail-hero.delivered { border-left-color: var(--green); }
+    .detail-hero.transit   { border-left-color: var(--primary); }
+    .detail-hero.warehouse { border-left-color: var(--amber); }
+
+    .hero-top {
+      display: flex; align-items: flex-start; justify-content: space-between;
+      gap: 20px; flex-wrap: wrap; margin-bottom: 16px;
+    }
+    .hero-num-row {
+      display: flex; align-items: center; gap: 10px;
+      flex-wrap: wrap;
+    }
+    .hero-num {
+      font-family: 'JetBrains Mono', 'IBM Plex Mono', monospace;
+      font-size: 26px; font-weight: 700;
+      color: var(--text);
+      letter-spacing: -.5px;
+    }
+    .hero-copy {
+      width: 32px; height: 32px;
+      display: flex; align-items: center; justify-content: center;
+      border: 1.5px solid var(--border);
+      border-radius: 7px;
+      background: var(--surface-2);
+      color: var(--text-3);
+      cursor: pointer;
+      transition: all .15s;
+    }
+    .hero-copy:hover { background: var(--primary-bg); color: var(--primary); border-color: var(--primary-bdr); }
+    .hero-copy.copied { background: var(--green-bg); color: var(--green); border-color: rgba(15,169,110,.3); }
+
+    .hero-badge {
+      padding: 6px 14px;
+      border-radius: 30px;
+      font-size: 13px; font-weight: 700;
+      text-transform: uppercase; letter-spacing: .4px;
+      flex-shrink: 0;
+    }
+    .hero-badge.delivered { background: var(--green-bg); color: #087A51; }
+    .hero-badge.transit   { background: var(--primary-bg); color: var(--primary-h); }
+    .hero-badge.warehouse { background: var(--amber-bg); color: #A86100; }
+
+    .hero-meta {
+      display: flex; gap: 16px; flex-wrap: wrap;
+      color: var(--text-2); font-size: 14px;
+    }
+    .hero-meta strong { color: var(--text); font-weight: 600; }
+
+    /* Timeline */
+    .timeline-card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-lg);
+      padding: 22px 26px;
+      box-shadow: var(--shadow);
+      margin-bottom: 18px;
+    }
+    .timeline-title {
+      font-size: 13px; font-weight: 600;
+      color: var(--text-3);
+      text-transform: uppercase; letter-spacing: .5px;
+      margin-bottom: 18px;
+    }
+    .timeline-track {
+      display: flex; align-items: center; gap: 0;
+      position: relative;
+    }
+    .tl-node {
+      flex-shrink: 0;
+      width: 36px; height: 36px;
+      border-radius: 50%;
+      background: var(--surface-2);
+      border: 2px solid var(--border);
+      display: flex; align-items: center; justify-content: center;
+      color: var(--text-3);
+      transition: all .2s;
+      z-index: 1;
+    }
+    .tl-node.done   { background: var(--green); border-color: var(--green); color: #fff; }
+    .tl-node.active { background: var(--primary); border-color: var(--primary); color: #fff; box-shadow: 0 0 0 5px rgba(46,134,222,.18); }
+    .tl-node.warehouse-active { background: var(--amber); border-color: var(--amber); color: #fff; }
+
+    .tl-line {
+      flex: 1;
+      height: 3px;
+      background: var(--border);
+      transition: background .2s;
+    }
+    .tl-line.done { background: var(--green); }
+    .tl-line.partial {
+      background: linear-gradient(to right, var(--green) 50%, var(--border) 50%);
+    }
+
+    .tl-labels {
+      display: flex; justify-content: space-between;
+      margin-top: 12px;
+    }
+    .tl-lbl {
+      flex: 1; text-align: center;
+      font-size: 12px; font-weight: 500;
+      color: var(--text-3);
+    }
+    .tl-lbl:first-child { text-align: left; }
+    .tl-lbl:last-child  { text-align: right; }
+    .tl-lbl.done   { color: var(--green); font-weight: 600; }
+    .tl-lbl.active { color: var(--primary); font-weight: 600; }
+    .tl-lbl-date { display: block; font-size: 11px; color: var(--text-3); margin-top: 2px; font-weight: 400; }
+
+    /* Grid layout */
+    .detail-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 18px;
+    }
+    @media (max-width: 700px) { .detail-grid { grid-template-columns: 1fr; } }
+
+    .info-card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-lg);
+      padding: 20px 22px;
+      box-shadow: var(--shadow);
+    }
+    .info-card-title {
+      font-size: 12px; font-weight: 600;
+      color: var(--text-3);
+      text-transform: uppercase; letter-spacing: .5px;
+      margin-bottom: 14px;
+      display: flex; align-items: center; gap: 7px;
+    }
+    .info-card-title svg { color: var(--text-3); }
+
+    .info-row {
+      display: flex; justify-content: space-between; align-items: baseline;
+      padding: 9px 0;
+      border-bottom: 1px solid var(--border-light);
+      font-size: 14px;
+    }
+    .info-row:last-child { border-bottom: none; }
+    .info-row .lbl { color: var(--text-2); }
+    .info-row .val {
+      color: var(--text); font-weight: 600;
+      font-variant-numeric: tabular-nums;
+    }
+
+    /* Big numbers */
+    .metrics-row {
+      display: grid; grid-template-columns: repeat(3, 1fr);
+      gap: 12px;
+      margin-bottom: 18px;
+    }
+    .big-metric {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-lg);
+      padding: 18px 20px;
+      box-shadow: var(--shadow);
+    }
+    .big-metric-lbl {
+      font-size: 11px; font-weight: 600;
+      color: var(--text-3);
+      text-transform: uppercase; letter-spacing: .5px;
+      margin-bottom: 6px;
+    }
+    .big-metric-val {
+      font-family: 'IBM Plex Sans Condensed', sans-serif;
+      font-size: 32px; font-weight: 700;
+      color: var(--text);
+      letter-spacing: -.5px;
+      line-height: 1;
+      font-variant-numeric: tabular-nums;
+    }
+    .big-metric-unit {
+      font-size: 14px; color: var(--text-3);
+      font-weight: 500; margin-left: 4px;
+    }
+
+    /* Total cost card */
+    .total-card {
+      grid-column: 1 / -1;
+      background: linear-gradient(135deg, var(--green-bg) 0%, rgba(15,169,110,.06) 100%);
+      border: 1px solid rgba(15,169,110,.2);
+    }
+    .total-card .info-card-title { color: #087A51; }
+    .total-row.grand {
+      padding: 14px 0 0;
+      margin-top: 8px;
+      border-top: 2px solid rgba(15,169,110,.25);
+    }
+    .total-row.grand .lbl {
+      font-size: 15px; font-weight: 700; color: #087A51;
+    }
+    .total-row.grand .val {
+      font-family: 'IBM Plex Sans Condensed', sans-serif;
+      font-size: 26px; font-weight: 800; color: var(--green);
+    }
+
+    /* Loader / error */
+    .center-state {
+      text-align: center; padding: 80px 20px;
+      color: var(--text-2);
+    }
+    .center-state .spinner { margin: 0 auto 16px; }
+  </style>
+</head>
+<body>
+
+  <header class="dash-header">
+    <div class="dash-header-inner">
+      <a href="/dashboard.html" class="header-logo">
+        <svg width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+          <path d="M3 17l2-7h14l2 7H3Z"/>
+          <path d="M5 10V7a1 1 0 0 1 1-1h4v4"/>
+          <path d="M14 6h-3v4"/>
+          <circle cx="7.5" cy="17.5" r="1.5"/><circle cx="16.5" cy="17.5" r="1.5"/>
+        </svg>
+        <span style="font-family:'IBM Plex Sans Condensed',sans-serif;font-weight:700;letter-spacing:-.3px;">FreewayChina</span>
+      </a>
+      <div class="header-right">
+        <div class="client-badge">
+          <svg width="11" height="11" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24">
+            <circle cx="12" cy="8" r="4"/><path d="M4 20c0-4 3.6-7 8-7s8 3 8 7"/>
+          </svg>
+          <span id="clientIdDisplay">—</span>
+        </div>
+        <button class="btn-ghost" id="logoutBtn">Выйти</button>
+      </div>
+    </div>
+  </header>
+
+  <main class="detail-page">
+
+    <a href="/dashboard.html#sec=shipments" class="back-link">
+      <svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+        <line x1="19" y1="12" x2="5" y2="12"/><polyline points="12 19 5 12 12 5"/>
+      </svg>
+      Все грузы
+    </a>
+
+    <div id="loadingState" class="center-state">
+      <div class="spinner"></div>
+      <p>Загружаем детали груза…</p>
+    </div>
+
+    <div id="errorState" class="center-state hidden">
+      <div class="state-icon red" style="margin:0 auto 12px;">
+        <svg width="24" height="24" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+          <circle cx="12" cy="12" r="10"/>
+          <line x1="15" y1="9" x2="9" y2="15"/><line x1="9" y1="9" x2="15" y2="15"/>
+        </svg>
+      </div>
+      <p style="font-size:18px;font-weight:700;color:var(--text);margin-bottom:8px">Груз не найден</p>
+      <p id="errorMsg" style="margin-bottom:16px"></p>
+      <a href="/dashboard.html#sec=shipments" class="state-btn" style="text-decoration:none;display:inline-block">Вернуться к списку</a>
+    </div>
+
+    <div id="content" class="hidden"></div>
+
+  </main>
+
+  <script src="utils.js"></script>
+  <script src="cargo-detail.js"></script>
+</body>
+</html>

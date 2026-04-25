@@ -91,4 +91,4 @@ document.getElementById('prevBtn').addEventListener('click', () => { currentPage
 document.getElementById('nextBtn').addEventListener('click', () => { currentPage++; loadShipments(); });
 
 // ─── Init ─────────────────────────────────────────────────────────────────────
-loadShipments();
+checkAuth(['admin', 'employee']).then(user => { if (user) loadShipments(); });

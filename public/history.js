@@ -136,4 +136,4 @@ document.getElementById('detailModal').addEventListener('click', e => {
 document.addEventListener('keydown', e => { if (e.key === 'Escape') closeDetail(); });
 
 // ─── Init ─────────────────────────────────────────────────────────────────────
-loadHistory();
+checkAuth(['admin', 'employee']).then(user => { if (user) loadHistory(); });

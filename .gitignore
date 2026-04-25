@@ -4,3 +4,4 @@ credentials/*.json
 *.log
 .DS_Store
 public/_redirects
+credentials-list.txt

@@ -167,4 +167,4 @@ function showState(s) {
 }
 
 // ─── Init ─────────────────────────────────────────────────────────────────────
-loadDetail();
+checkAuth(['admin', 'employee']).then(user => { if (user) loadDetail(); });

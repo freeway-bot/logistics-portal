@@ -3,6 +3,88 @@
 let statsData = null;
 let dailyData = null;
 
+// ─── Add Client Modal ─────────────────────────────────────────────────────────
+
+function openAddClientModal() {
+  document.getElementById('addClientModal').classList.remove('hidden');
+  document.getElementById('addClientForm').classList.remove('hidden');
+  document.getElementById('addClientResult').classList.add('hidden');
+  document.getElementById('newClientId').value = '';
+  document.getElementById('newClientName').value = '';
+  document.getElementById('addClientError').classList.add('hidden');
+  document.getElementById('newClientId').focus();
+}
+
+function closeAddClientModal() {
+  document.getElementById('addClientModal').classList.add('hidden');
+}
+
+document.addEventListener('DOMContentLoaded', () => {
+  document.getElementById('addClientBtn')?.addEventListener('click', openAddClientModal);
+  document.getElementById('addClientClose')?.addEventListener('click', closeAddClientModal);
+  document.getElementById('addClientModal')?.addEventListener('click', e => {
+    if (e.target === document.getElementById('addClientModal')) closeAddClientModal();
+  });
+
+  document.getElementById('addClientSubmit')?.addEventListener('click', async () => {
+    const clientId  = document.getElementById('newClientId').value.trim().toUpperCase();
+    const fullName  = document.getElementById('newClientName').value.trim();
+    const errEl     = document.getElementById('addClientError');
+    const submitBtn = document.getElementById('addClientSubmit');
+
+    if (!clientId) {
+      errEl.textContent = 'Введите Client ID';
+      errEl.classList.remove('hidden');
+      return;
+    }
+
+    submitBtn.disabled = true;
+    submitBtn.textContent = 'Создаём…';
+    errEl.classList.add('hidden');
+
+    try {
+      const res  = await fetch('/api/admin/users', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ client_id: clientId, full_name: fullName, role: 'client', lang: 'ru' }),
+      });
+      const data = await res.json();
+
+      if (!res.ok) {
+        errEl.textContent = data.error || 'Ошибка создания';
+        errEl.classList.remove('hidden');
+        return;
+      }
+
+      document.getElementById('resultClientId').textContent = data.client_id;
+      document.getElementById('resultPassword').textContent = data.password;
+      document.getElementById('addClientForm').classList.add('hidden');
+      document.getElementById('addClientResult').classList.remove('hidden');
+
+      document.getElementById('copyPwdBtn').onclick = () => {
+        copyText(data.password, 'пароль');
+      };
+      document.getElementById('addAnotherBtn').onclick = () => {
+        document.getElementById('addClientForm').classList.remove('hidden');
+        document.getElementById('addClientResult').classList.add('hidden');
+        document.getElementById('newClientId').value = '';
+        document.getElementById('newClientName').value = '';
+        document.getElementById('newClientId').focus();
+      };
+    } catch {
+      errEl.textContent = 'Нет соединения с сервером';
+      errEl.classList.remove('hidden');
+    } finally {
+      submitBtn.disabled = false;
+      submitBtn.textContent = 'Создать и получить пароль';
+    }
+  });
+
+  document.addEventListener('keydown', e => {
+    if (e.key === 'Escape') closeAddClientModal();
+  });
+});
+
 // ─── Load ─────────────────────────────────────────────────────────────────────
 
 async function loadAll() {
@@ -185,4 +267,4 @@ window.addEventListener('resize', () => {
 });
 
 // ─── Init ─────────────────────────────────────────────────────────────────────
-loadAll();
+checkAuth(['admin', 'employee']).then(user => { if (user) loadAll(); });

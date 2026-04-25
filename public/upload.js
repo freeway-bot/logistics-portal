@@ -11,6 +11,9 @@ const commentField  = document.getElementById('commentField');
 const operatorField = document.getElementById('operatorField');
 const submitBtn     = document.getElementById('submitBtn');
 
+// Auth guard — redirect to login if not employee/admin
+checkAuth(['admin', 'employee']);
+
 // Set today as default date
 shipDate.value = new Date().toISOString().slice(0, 10);
 
