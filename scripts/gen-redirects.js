@@ -13,6 +13,6 @@ if (!railwayUrl) {
   process.exit(0);
 }
 
-const content = `/api/*  ${railwayUrl}/api/:splat  200\n`;
+const content = `/api/*  ${railwayUrl}/api/:splat  200\n/*  /index.html  200\n`;
 fs.writeFileSync(path.join(__dirname, '../public/_redirects'), content);
-console.log(`[gen-redirects] Written: /api/* → ${railwayUrl}/api/:splat`);
+console.log(`[gen-redirects] Written: /api/* → ${railwayUrl}/api/:splat + SPA fallback`);

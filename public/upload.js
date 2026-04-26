@@ -1,32 +1,28 @@
-// upload.js — create shipment from track list
+// upload.js — создание отгрузки: список треков + номер груза.
+// Бэкенд привязывает каждый трек в Scans и добавляет новую строку в лист «Логистика».
 
-const trackInput    = document.getElementById('trackInput');
-const fileInput     = document.getElementById('fileInput');
-const trackCount    = document.getElementById('trackCount');
-const shipDate      = document.getElementById('shipDate');
-const shipmentCode  = document.getElementById('shipmentCode');
-const totalWeight   = document.getElementById('totalWeight');
-const totalVolume   = document.getElementById('totalVolume');
-const commentField  = document.getElementById('commentField');
-const operatorField = document.getElementById('operatorField');
-const submitBtn     = document.getElementById('submitBtn');
+const trackInput   = document.getElementById('trackInput');
+const fileInput    = document.getElementById('fileInput');
+const trackCount   = document.getElementById('trackCount');
+const cargoNumber  = document.getElementById('cargoNumber');
+const clientId     = document.getElementById('clientId');
+const submitBtn    = document.getElementById('submitBtn');
 
-// Auth guard — redirect to login if not employee/admin
 checkAuth(['admin', 'employee']);
 
-// Set today as default date
-shipDate.value = new Date().toISOString().slice(0, 10);
+// ─── Счётчик треков ───────────────────────────────────────────────────────────
 
-// ─── Track count display ──────────────────────────────────────────────────────
+function parseTracks(text) {
+  return text.split(/\r?\n/).map(t => t.trim()).filter(Boolean);
+}
 
 function updateCount() {
-  const tracks = parseTracks(trackInput.value);
-  trackCount.textContent = `${tracks.length} треков`;
+  trackCount.textContent = `${parseTracks(trackInput.value).length} треков`;
 }
 
 trackInput.addEventListener('input', updateCount);
 
-// ─── File upload ──────────────────────────────────────────────────────────────
+// ─── Импорт TXT / CSV ─────────────────────────────────────────────────────────
 
 fileInput.addEventListener('change', () => {
   const file = fileInput.files[0];
@@ -43,60 +39,44 @@ fileInput.addEventListener('change', () => {
   fileInput.value = '';
 });
 
-// ─── Parse tracks ─────────────────────────────────────────────────────────────
-
-function parseTracks(text) {
-  return text.split(/\r?\n/).map(t => t.trim()).filter(Boolean);
-}
-
 // ─── Submit ───────────────────────────────────────────────────────────────────
 
 submitBtn.addEventListener('click', async () => {
   const tracks = parseTracks(trackInput.value);
   if (tracks.length === 0) { toast('Введите трек-номера', 'error'); return; }
 
-  const code = shipmentCode.value.trim();
-  if (!code) { toast('Укажите код отправки', 'error'); shipmentCode.focus(); return; }
+  const cargo  = cargoNumber.value.trim();
+  const client = clientId.value.trim();
 
-  submitBtn.disabled  = true;
-  submitBtn.textContent = 'Создаём отправку…';
+  submitBtn.disabled    = true;
+  submitBtn.textContent = 'Создаём отгрузку…';
   document.getElementById('resultPlaceholder').classList.add('hidden');
   document.getElementById('resultLoading').classList.remove('hidden');
   document.getElementById('resultBox').classList.add('hidden');
 
   try {
-    const body = {
-      tracks,
-      shipment_code: code,
-      shipped_at:    shipDate.value || '',
-      total_weight:  totalWeight.value.trim(),
-      total_volume:  totalVolume.value.trim(),
-      comment:       commentField.value.trim(),
-      operator:      operatorField.value.trim(),
-    };
-
-    const res  = await fetch('/api/admin/shipments', {
+    const res = await fetch('/api/admin/shipments', {
       method:  'POST',
       headers: { 'Content-Type': 'application/json' },
-      body:    JSON.stringify(body),
+      body:    JSON.stringify({ tracks, cargo_number: cargo, client_id: client }),
     });
     const data = await res.json();
     if (!res.ok) throw new Error(data.error || 'Ошибка сервера');
 
-    renderResult(data, tracks.length);
+    renderResult(data);
   } catch (err) {
     toast(err.message, 'error');
     document.getElementById('resultLoading').classList.add('hidden');
     document.getElementById('resultPlaceholder').classList.remove('hidden');
   } finally {
     submitBtn.disabled    = false;
-    submitBtn.textContent = 'Создать отправку';
+    submitBtn.textContent = 'Создать отгрузку';
   }
 });
 
-// ─── Render result ────────────────────────────────────────────────────────────
+// ─── Результат ────────────────────────────────────────────────────────────────
 
-function renderResult(data, inputCount) {
+function renderResult(data) {
   document.getElementById('resultLoading').classList.add('hidden');
 
   const box     = document.getElementById('resultBox');
@@ -104,31 +84,31 @@ function renderResult(data, inputCount) {
   const stats   = document.getElementById('resultStats');
   const details = document.getElementById('resultDetails');
 
-  title.textContent = `Отправка создана — ${data.updated} треков`;
+  title.textContent = `Отгрузка ${data.cargo_number} — ${data.updated} треков`;
 
   stats.innerHTML = [
-    { label: 'ID отправки',           value: data.shipment_id,          cls: 'neu' },
-    { label: 'Обновлено',             value: data.updated,              cls: data.updated > 0 ? 'ok' : 'warn' },
-    { label: 'Не найдено',            value: data.notFound.length,      cls: data.notFound.length > 0 ? 'err' : 'ok' },
-    { label: 'Дублей во вводе',       value: data.duplicates.length,    cls: data.duplicates.length > 0 ? 'warn' : 'ok' },
-    { label: 'Уже отправлено ранее',  value: data.alreadyShipped.length,cls: 'neu' },
+    { label: 'Номер груза',          value: data.cargo_number,         cls: 'neu', big: false },
+    { label: 'Привязано треков',     value: data.updated,              cls: data.updated > 0 ? 'ok' : 'warn' },
+    { label: 'Не найдено',           value: data.notFound.length,      cls: data.notFound.length > 0 ? 'err' : 'ok' },
+    { label: 'Дублей в списке',      value: data.duplicates.length,    cls: data.duplicates.length > 0 ? 'warn' : 'ok' },
+    { label: 'Уже отправлены',       value: data.alreadyShipped.length,cls: 'neu' },
   ].map(s => `
     <div class="result-stat ${s.cls}">
-      <div class="result-stat-label">${s.label}</div>
-      <div class="result-stat-value" style="font-size:${s.label === 'ID отправки' ? '13px' : '22px'};word-break:break-all">${esc(String(s.value))}</div>
+      <div class="result-stat-label">${esc(s.label)}</div>
+      <div class="result-stat-value" style="font-size:${s.label === 'Номер груза' ? '14px' : '22px'};word-break:break-all">${esc(String(s.value))}</div>
     </div>`).join('');
 
   let html = '';
 
   if (data.updated > 0) {
     html += `<div style="margin-bottom:10px">
-      <a href="/shipment-detail.html?id=${encodeURIComponent(data.shipment_id)}"
+      <a href="/shipment-detail.html?id=${encodeURIComponent(data.cargo_number)}"
          style="display:inline-flex;align-items:center;gap:6px;color:var(--primary);font-size:13px;font-weight:600;text-decoration:none">
         <svg width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
           <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/>
           <polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/>
         </svg>
-        Открыть детали отправки →
+        Открыть отгрузку →
       </a>
     </div>`;
   }
@@ -138,20 +118,20 @@ function renderResult(data, inputCount) {
              <div class="result-list">${data.notFound.map(t => esc(t)).join('<br>')}</div>`;
   }
   if (data.duplicates.length > 0) {
-    html += `<div class="result-list-title">Дубли в вашем списке (${data.duplicates.length})</div>
+    html += `<div class="result-list-title">Дубли в списке (${data.duplicates.length})</div>
              <div class="result-list">${data.duplicates.map(t => esc(t)).join('<br>')}</div>`;
   }
   if (data.alreadyShipped.length > 0) {
-    html += `<div class="result-list-title">Уже были отправлены (${data.alreadyShipped.length})</div>
+    html += `<div class="result-list-title">Уже были отправлены ранее (${data.alreadyShipped.length})</div>
              <div class="result-list">${data.alreadyShipped.map(t => esc(t)).join('<br>')}</div>`;
   }
 
   if (!html) {
-    html = `<div style="color:var(--green);font-size:13px;font-weight:600;margin-top:8px">✓ Все треки успешно привязаны к отправке</div>`;
+    html = `<div style="color:var(--green);font-size:13px;font-weight:600;margin-top:8px">✓ Все треки привязаны к грузу</div>`;
   }
 
   details.innerHTML = html;
   box.classList.remove('hidden');
 
-  if (data.updated > 0) toast(`Отправка ${data.shipment_id} создана — ${data.updated} треков`);
+  if (data.updated > 0) toast(`Груз ${data.cargo_number} создан — привязано ${data.updated} треков`);
 }

@@ -5,9 +5,8 @@
 [build.environment]
   NODE_VERSION = "18"
 
-# SPA fallback — not strictly needed (no client-side routing) but safe to have
+# SPA fallback
 [[redirects]]
   from = "/*"
   to = "/index.html"
   status = 200
-  conditions = {Role = ["_no_match"]}

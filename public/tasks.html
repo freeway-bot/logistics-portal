@@ -1,0 +1,258 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Задачи</title>
+  <link rel="stylesheet" href="style.css" />
+  <link rel="stylesheet" href="admin.css" />
+  <style>
+    /* ── Summary cards ── */
+    .summary-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+      gap: 12px;
+      margin-bottom: 20px;
+    }
+    .summary-card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-lg);
+      padding: 14px 18px;
+      box-shadow: var(--shadow);
+      cursor: pointer;
+      transition: all var(--t);
+    }
+    .summary-card:hover { border-color: var(--primary-bdr); }
+    .summary-card.active { border-color: var(--primary); background: var(--primary-bg); }
+    .summary-card-value {
+      font-size: 28px;
+      font-weight: 800;
+      line-height: 1;
+      margin-bottom: 4px;
+    }
+    .summary-card-label {
+      font-size: 11px;
+      font-weight: 600;
+      color: var(--text-3);
+      text-transform: uppercase;
+      letter-spacing: .4px;
+    }
+    .c-red    .summary-card-value { color: #dc2626; }
+    .c-amber  .summary-card-value { color: #d97706; }
+    .c-blue   .summary-card-value { color: #2563eb; }
+    .c-purple .summary-card-value { color: #7c3aed; }
+    .c-gray   .summary-card-value { color: var(--text-2); }
+
+    /* ── Toolbar ── */
+    .tasks-toolbar {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      flex-wrap: wrap;
+      padding: 12px 18px;
+      border-bottom: 1px solid var(--border);
+      background: var(--surface-2);
+    }
+    .tasks-search {
+      flex: 1;
+      min-width: 200px;
+      max-width: 340px;
+      padding: 7px 12px 7px 32px;
+      border: 1.5px solid var(--border);
+      border-radius: var(--radius-sm);
+      font-size: 13px;
+      background: var(--surface) url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='13' height='13' fill='none' stroke='%23999' stroke-width='2' viewBox='0 0 24 24'%3E%3Ccircle cx='11' cy='11' r='8'/%3E%3Cpath d='m21 21-4.35-4.35'/%3E%3C/svg%3E") no-repeat 10px center;
+      color: var(--text);
+      outline: none;
+    }
+    .tasks-search:focus { border-color: var(--primary); }
+    .tasks-search::placeholder { color: var(--text-3); }
+
+    .filter-label {
+      font-size: 11px;
+      font-weight: 600;
+      color: var(--text-3);
+      white-space: nowrap;
+    }
+    .filter-pill {
+      padding: 4px 12px;
+      border-radius: 20px;
+      font-size: 11px;
+      font-weight: 600;
+      border: 1.5px solid var(--border);
+      background: var(--surface);
+      color: var(--text-2);
+      cursor: pointer;
+      transition: all var(--t);
+      white-space: nowrap;
+    }
+    .filter-pill:hover  { border-color: var(--primary-bdr); color: var(--primary); }
+    .filter-pill.active { border-color: var(--primary); background: var(--primary-bg); color: var(--primary); font-weight: 700; }
+
+    /* ── Table ── */
+    .tasks-table { width: 100%; border-collapse: collapse; }
+    .tasks-table th {
+      padding: 9px 14px;
+      font-size: 10px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: .5px;
+      color: var(--text-3);
+      background: var(--surface-2);
+      border-bottom: 1px solid var(--border);
+      white-space: nowrap;
+      text-align: left;
+    }
+    .tasks-table td {
+      padding: 10px 14px;
+      font-size: 12px;
+      border-bottom: 1px solid var(--border-light);
+      vertical-align: middle;
+    }
+    .tasks-table tr.task-row { cursor: pointer; }
+    .tasks-table tr.task-row:hover td { background: var(--primary-bg); }
+    .tasks-table tr:last-child td { border-bottom: none; }
+
+    .cargo-id {
+      font-family: 'Courier New', monospace;
+      font-weight: 700;
+      font-size: 12px;
+      color: var(--primary-h);
+    }
+    .issue-count {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      width: 22px;
+      height: 22px;
+      border-radius: 50%;
+      font-size: 11px;
+      font-weight: 800;
+      background: #fef2f2;
+      color: #dc2626;
+    }
+    .issue-count.warn { background: #fffbeb; color: #d97706; }
+    .issue-count.ok   { background: #f0fdf4; color: #16a34a; }
+
+    /* ── Missing field tags ── */
+    .tag-row { display: flex; gap: 5px; flex-wrap: wrap; }
+    .tag {
+      display: inline-flex;
+      align-items: center;
+      gap: 3px;
+      padding: 2px 8px;
+      border-radius: 4px;
+      font-size: 10px;
+      font-weight: 700;
+      white-space: nowrap;
+    }
+    .tag-missing { background: #fef2f2; color: #dc2626; border: 1px solid #fecaca; }
+    .tag-warn    { background: #fffbeb; color: #d97706; border: 1px solid #fde68a; }
+    .tag-ok      { background: #f0fdf4; color: #16a34a; border: 1px solid #bbf7d0; }
+
+    /* ── Priority indicator ── */
+    .priority-dot {
+      width: 8px; height: 8px;
+      border-radius: 50%;
+      display: inline-block;
+      flex-shrink: 0;
+    }
+    .priority-high   { background: #ef4444; }
+    .priority-medium { background: #f59e0b; }
+    .priority-low    { background: #94a3b8; }
+
+    /* ── Footer pagination ── */
+    .tasks-footer {
+      padding: 10px 18px;
+      border-top: 1px solid var(--border);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      font-size: 12px;
+      color: var(--text-3);
+    }
+    .btn-pg {
+      padding: 5px 14px;
+      font-size: 12px;
+      border: 1.5px solid var(--border);
+      border-radius: var(--radius-sm);
+      background: var(--surface-2);
+      color: var(--text-2);
+      cursor: pointer;
+      transition: all var(--t);
+    }
+    .btn-pg:hover:not(:disabled) { border-color: var(--primary-bdr); color: var(--primary); }
+    .btn-pg:disabled { opacity: .4; cursor: not-allowed; }
+
+    .tasks-count-label {
+      font-size: 12px;
+      color: var(--text-3);
+      padding: 0 4px;
+    }
+  </style>
+</head>
+<body>
+
+  <div id="adminHeader"></div>
+  <script src="admin-header.js"></script>
+
+  <main class="page-content">
+
+    <!-- Loading -->
+    <div id="loadingState" class="state-center">
+      <div class="spinner"></div>
+      <p class="state-desc">Анализируем данные грузов…</p>
+    </div>
+
+    <!-- Content -->
+    <div id="content" class="hidden">
+
+      <!-- Summary -->
+      <div class="summary-grid" id="summaryGrid"></div>
+
+      <!-- Table card -->
+      <div class="admin-card" style="padding:0;overflow:hidden">
+
+        <!-- Toolbar -->
+        <div class="tasks-toolbar">
+          <input class="tasks-search" type="search" id="searchInput" placeholder="Поиск по номеру груза, клиенту…" />
+          <span class="filter-label">Показать:</span>
+          <div id="filterPills" style="display:flex;gap:6px;flex-wrap:wrap"></div>
+          <span class="tasks-count-label" id="countLabel"></span>
+        </div>
+
+        <!-- Table -->
+        <div class="table-scroll">
+          <table class="tasks-table">
+            <thead>
+              <tr>
+                <th style="width:28px"></th>
+                <th>Номер груза</th>
+                <th>Клиент</th>
+                <th>Дата отгрузки</th>
+                <th>Проблемы</th>
+                <th>Детали</th>
+              </tr>
+            </thead>
+            <tbody id="tasksBody"></tbody>
+          </table>
+        </div>
+
+        <!-- Footer -->
+        <div class="tasks-footer" id="tasksFooter" style="display:none">
+          <button class="btn-pg" id="prevBtn">← Назад</button>
+          <span id="pageLabel"></span>
+          <button class="btn-pg" id="nextBtn">Вперёд →</button>
+        </div>
+      </div>
+
+    </div>
+
+  </main>
+
+  <script src="auth-guard.js"></script>
+  <script src="utils.js"></script>
+  <script src="tasks.js"></script>
+</body>
+</html>

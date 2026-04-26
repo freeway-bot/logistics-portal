@@ -101,6 +101,7 @@ async function loadAll() {
     statsData = stats;
     dailyData = daily;
 
+    renderTodayBlock(stats);
     renderMetrics(stats);
     renderChart(daily.days);
     renderProblems(stats.problems);
@@ -112,6 +113,49 @@ async function loadAll() {
     document.getElementById('errorMsg').textContent = err.message;
     showState('error');
   }
+}
+
+// ─── Today block ──────────────────────────────────────────────────────────────
+
+function renderTodayBlock(s) {
+  const chips = [
+    { label: 'Поступило сегодня',  value: s.addedToday,    color: '#3b82f6', bg: '#eff6ff' },
+    { label: 'Отправлено сегодня', value: s.shippedToday,  color: '#10b981', bg: '#f0fdf4' },
+    { label: 'За 7 дней',          value: s.shippedWeek,   color: '#8b5cf6', bg: '#f5f3ff' },
+    { label: 'На складе сейчас',   value: s.warehouse,     color: '#f59e0b', bg: '#fffbeb' },
+  ];
+  document.getElementById('todayRow').innerHTML = chips.map(c => `
+    <div style="display:flex;align-items:center;gap:10px;background:${c.bg};border:1px solid ${c.color}22;
+      border-radius:var(--radius);padding:10px 16px;min-width:160px;flex:1">
+      <div style="font-size:22px;font-weight:800;color:${c.color}">${c.value ?? '—'}</div>
+      <div style="font-size:12px;font-weight:600;color:${c.color}cc;line-height:1.3">${c.label}</div>
+    </div>`).join('');
+}
+
+// ─── Missing cargo data check ─────────────────────────────────────────────────
+
+async function checkMissingCargo() {
+  try {
+    const res  = await fetch('/api/admin/shipments?limit=2000');
+    const body = await res.json();
+    if (!res.ok) return;
+
+    const data = body.data || [];
+    const noTotal  = data.filter(s => !parseFloat(s.total)).length;
+    const noWeight = data.filter(s => !parseFloat(s.total_weight)).length;
+    const noVolume = data.filter(s => !parseFloat(s.total_volume)).length;
+
+    const issues = [];
+    if (noTotal  > 0) issues.push(`<b>${noTotal}</b> грузов без суммы ($)`);
+    if (noWeight > 0) issues.push(`<b>${noWeight}</b> без веса`);
+    if (noVolume > 0) issues.push(`<b>${noVolume}</b> без объёма`);
+
+    if (!issues.length) return;
+
+    document.getElementById('missingAlertText').innerHTML =
+      `Незаполненные данные в грузах: ${issues.join(', ')}. Дозаполните в <a href="/shipments.html" style="color:#92400e;font-weight:700">списке отгрузок</a>.`;
+    document.getElementById('missingAlert').classList.remove('hidden');
+  } catch { /* тихо игнорируем */ }
 }
 
 // ─── Metrics ──────────────────────────────────────────────────────────────────

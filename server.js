@@ -5,7 +5,8 @@ const cookieParser = require('cookie-parser');
 const rateLimit    = require('express-rate-limit');
 const bcrypt       = require('bcrypt');
 const jwt          = require('jsonwebtoken');
-const { google }   = require('googleapis');
+const { sheets: sheetsAPI } = require('@googleapis/sheets');
+const { GoogleAuth } = require('google-auth-library');
 const path         = require('path');
 
 const app  = express();
@@ -66,9 +67,9 @@ const SCOPES_RO = ['https://www.googleapis.com/auth/spreadsheets.readonly'];
 async function getAuth(write = false) {
   const scopes = write ? SCOPES_RW : SCOPES_RO;
   if (process.env.GOOGLE_SERVICE_ACCOUNT_JSON) {
-    return new google.auth.GoogleAuth({ credentials: JSON.parse(process.env.GOOGLE_SERVICE_ACCOUNT_JSON), scopes });
+    return new GoogleAuth({ credentials: JSON.parse(process.env.GOOGLE_SERVICE_ACCOUNT_JSON), scopes });
   }
-  return new google.auth.GoogleAuth({ keyFile: process.env.GOOGLE_KEY_FILE || './credentials/service-account.json', scopes });
+  return new GoogleAuth({ keyFile: process.env.GOOGLE_KEY_FILE || './credentials/service-account.json', scopes });
 }
 
 // ─── Column mapping (Scans) ───────────────────────────────────────────────────
@@ -95,7 +96,7 @@ function buildPhotoUrl(p) {
 
 async function fetchSheetRows() {
   const auth   = await getAuth(false);
-  const sheets = google.sheets({ version: 'v4', auth });
+  const sheets = sheetsAPI({ version: 'v4', auth });
   const res    = await sheets.spreadsheets.values.get({
     spreadsheetId: SCANS_SPREADSHEET_ID,
     range: process.env.SHEET_RANGE || 'Scans!A:Z',
@@ -149,7 +150,7 @@ function invalidateUsersCache() { usersCache.ts = 0; }
 
 async function fetchUsersRows() {
   const auth   = await getAuth(false);
-  const sheets = google.sheets({ version: 'v4', auth });
+  const sheets = sheetsAPI({ version: 'v4', auth });
   const res    = await sheets.spreadsheets.values.get({
     spreadsheetId: LOGISTICS_SPREADSHEET_ID,
     range: `${USERS_SHEET_NAME}!A:K`,
@@ -191,7 +192,7 @@ async function updateUserLastLogin(row) {
     const col = headers.indexOf('last_login');
     if (col === -1) return;
     const auth   = await getAuth(true);
-    const sheets = google.sheets({ version: 'v4', auth });
+    const sheets = sheetsAPI({ version: 'v4', auth });
     await sheets.spreadsheets.values.update({
       spreadsheetId: LOGISTICS_SPREADSHEET_ID,
       range: `${USERS_SHEET_NAME}!${toLetterCol(col)}${row}`,
@@ -210,7 +211,7 @@ async function writeToPasswordsSheet(clientId, password, role = 'Клиент', 
   if (USE_MOCK) return;
   try {
     const auth   = await getAuth(true);
-    const sheets = google.sheets({ version: 'v4', auth });
+    const sheets = sheetsAPI({ version: 'v4', auth });
     const date   = new Date().toLocaleDateString('ru-RU');
 
     // Check if row for this clientId already exists → update it, else append
@@ -276,40 +277,60 @@ function addOpLog(entry) {
   if (opLog.length > OP_LOG_MAX) opLog.length = OP_LOG_MAX;
 }
 
-// ─── Shipments helpers ────────────────────────────────────────────────────────
+// ─── Отправления sheet helpers ────────────────────────────────────────────────
+// Отдельный лист в таблице Scans: Дата | НомерГруза | Трек | Клиент | Оператор
+// Хранит привязку трек → груз (вместо колонки shipment_id в листе Scans).
 
-const SHIPMENTS_SHEET_NAME = process.env.SHIPMENTS_SHEET_NAME || 'Shipments';
+const OTPRAVLENIYA_SHEET = 'Отправления';
+const OTPRAVLENIYA_HEADERS = ['Дата', 'НомерГруза', 'Трек', 'Клиент', 'Оператор'];
 
-let shipmentsCache = { data: null, ts: 0 };
-function invalidateShipmentsCache() { shipmentsCache.ts = 0; }
+let otpravleniyaCache = { data: null, ts: 0 };
+function invalidateOtpravleniyaCache() { otpravleniyaCache.ts = 0; }
 
-async function fetchShipmentsRows() {
+async function ensureOtpravleniyaSheet(sheetsClient) {
+  const spreadsheet = await sheetsClient.spreadsheets.get({ spreadsheetId: SCANS_SPREADSHEET_ID });
+  const exists = spreadsheet.data.sheets.some(s => s.properties.title === OTPRAVLENIYA_SHEET);
+  if (!exists) {
+    await sheetsClient.spreadsheets.batchUpdate({
+      spreadsheetId: SCANS_SPREADSHEET_ID,
+      requestBody: { requests: [{ addSheet: { properties: { title: OTPRAVLENIYA_SHEET } } }] },
+    });
+    await sheetsClient.spreadsheets.values.update({
+      spreadsheetId: SCANS_SPREADSHEET_ID,
+      range: `${OTPRAVLENIYA_SHEET}!A1:E1`,
+      valueInputOption: 'USER_ENTERED',
+      requestBody: { values: [OTPRAVLENIYA_HEADERS] },
+    });
+  }
+}
+
+async function fetchOtpravleniyaRows() {
   const auth   = await getAuth(false);
-  const sheets = google.sheets({ version: 'v4', auth });
-  const res    = await sheets.spreadsheets.values.get({
-    spreadsheetId: SCANS_SPREADSHEET_ID,
-    range: `${SHIPMENTS_SHEET_NAME}!A:J`,
-  });
-  return res.data.values || [];
+  const sheets = sheetsAPI({ version: 'v4', auth });
+  try {
+    const res = await sheets.spreadsheets.values.get({
+      spreadsheetId: SCANS_SPREADSHEET_ID,
+      range: `${OTPRAVLENIYA_SHEET}!A:E`,
+    });
+    return res.data.values || [];
+  } catch { return []; }
 }
 
-function parseShipmentRows(rows) {
-  if (!rows || rows.length < 2) return [];
-  const headers = rows[0].map(h => h.toString().trim().toLowerCase().replace(/\s+/g, '_'));
-  return rows.slice(1).map(row => {
-    const obj = {};
-    headers.forEach((h, i) => { obj[h] = (row[i] !== undefined ? row[i] : '').toString().trim(); });
-    return obj;
-  }).filter(r => r.shipment_id);
-}
-
-async function getAllShipments() {
-  if (USE_MOCK) return [];
+async function getOtpravleniya(forceRefresh = false) {
   const now = Date.now();
-  if (shipmentsCache.data && now - shipmentsCache.ts < CACHE_TTL) return shipmentsCache.data;
-  const rows = await fetchShipmentsRows();
-  const data = parseShipmentRows(rows);
-  shipmentsCache = { data, ts: now };
+  if (!forceRefresh && otpravleniyaCache.data && now - otpravleniyaCache.ts < CACHE_TTL) {
+    return otpravleniyaCache.data;
+  }
+  const rows = await fetchOtpravleniyaRows();
+  if (rows.length < 2) { otpravleniyaCache = { data: [], ts: now }; return []; }
+  const data = rows.slice(1).map(r => ({
+    date:        (r[0] || '').trim(),
+    cargo_number:(r[1] || '').trim(),
+    track:       (r[2] || '').trim(),
+    client_id:   (r[3] || '').trim(),
+    operator:    (r[4] || '').trim(),
+  })).filter(r => r.track);
+  otpravleniyaCache = { data, ts: now };
   return data;
 }
 
@@ -326,19 +347,19 @@ function invalidateCargoCache() { cargoCache.ts = 0; }
 
 async function fetchCargoRows() {
   const auth   = await getAuth(false);
-  const sheets = google.sheets({ version: 'v4', auth });
+  const sheets = sheetsAPI({ version: 'v4', auth });
   const res    = await sheets.spreadsheets.values.get({
     spreadsheetId: LOGISTICS_SPREADSHEET_ID,
-    range: `${LOGISTICS_CARGO_SHEET}!A:Z`,
+    range: `${LOGISTICS_CARGO_SHEET}!A:AM`,
   });
   return res.data.values || [];
 }
 
 function parseCargoRows(rows) {
   if (!rows || rows.length < 2) return { rawHeaders: [], data: [] };
-  const rawHeaders = rows[0].map(h => h.toString().trim().toLowerCase().replace(/\s+/g, '_'));
+  const rawHeaders = rows[0].map(h => h.toString().trim().toLowerCase().replace(/ё/g, 'е').replace(/\s+/g, '_'));
   const data = rows.slice(1).map((row, idx) => {
-    const obj = { _row: idx + 2 };
+    const obj = { _row: idx + 2, _vals: row }; // _vals = raw values by index
     rawHeaders.forEach((h, i) => { obj[h] = (row[i] !== undefined ? row[i] : '').toString().trim(); });
     return obj;
   }).filter(r => Object.entries(r).some(([k, v]) => k !== '_row' && v !== ''));
@@ -365,24 +386,45 @@ function findField(row, ...keywords) {
 }
 
 // Normalize a raw cargo row to a consistent shape for the frontend
+// Фиксированные индексы колонок «送货 Логистика»:
+// 0=Дата, 1=Клиент, 3=Категория, 4=НомерГруза, 5=Мест, 6=Вес, 7=Объём,
+// 8=Цена/кг, 9=Плотность, 10=Стоимость, 11=Страховка%, 12=Страховка$,
+// 13=Упаковка, 14=Погрузка, 15=Итого, 16=Статус, 17=Прибытие,
+// 20=Маршрут, 21=Перевозчик, 23=Комментарии
+const CARGO_COLS = {
+  date:0, client_id:1, category:3, cargo_number:4, places:5,
+  weight:6, volume:7, price_per_kg:8, density:9, cargo_cost:10,
+  insurance_pct:11, insurance_usd:12, packaging:13, loading:14,
+  total:15, status:16, arrival:17, route:20, carrier:21, comment:23,
+};
+
+function getCol(r, idx) {
+  const v = r._vals ? (r._vals[idx] !== undefined ? r._vals[idx] : '') : '';
+  return v.toString().trim();
+}
+
 function normalizeCargoRow(r) {
   return {
-    date:          findField(r, 'data', 'дата'),
-    cargo_number:  findField(r, '货物编号', 'номер_груза'),
-    category:      findField(r, '货物类型', 'категория'),
-    places:        findField(r, '件数', 'место'),
-    weight:        findField(r, '重量', 'вес'),
-    volume:        findField(r, '体积', 'объем'),
-    price_per_kg:  findField(r, '运费单价', 'цена_за'),
-    density:       findField(r, '密度', 'плотность'),
-    cargo_cost:    findField(r, '货值', 'стоимость_груза', 'стоимость'),
-    insurance_pct: findField(r, '保险比例', 'страховка%'),
-    insurance_usd: findField(r, '保险金额', 'страховка$'),
-    packaging:     findField(r, '包装费', 'упаковка'),
-    loading:       findField(r, '搬运费', 'погрузка'),
-    total:         findField(r, '总计', 'итого'),
-    status:        findField(r, 'статус'),
-    arrival:       findField(r, '到货日期', 'прибытие'),
+    date:          getCol(r, CARGO_COLS.date),
+    client_id:     getCol(r, CARGO_COLS.client_id),
+    cargo_number:  getCol(r, CARGO_COLS.cargo_number),
+    category:      getCol(r, CARGO_COLS.category),
+    places:        getCol(r, CARGO_COLS.places),
+    weight:        getCol(r, CARGO_COLS.weight),
+    volume:        getCol(r, CARGO_COLS.volume),
+    price_per_kg:  getCol(r, CARGO_COLS.price_per_kg),
+    density:       getCol(r, CARGO_COLS.density),
+    cargo_cost:    getCol(r, CARGO_COLS.cargo_cost),
+    insurance_pct: getCol(r, CARGO_COLS.insurance_pct),
+    insurance_usd: getCol(r, CARGO_COLS.insurance_usd),
+    packaging:     getCol(r, CARGO_COLS.packaging),
+    loading:       getCol(r, CARGO_COLS.loading),
+    total:         getCol(r, CARGO_COLS.total),
+    status:        getCol(r, CARGO_COLS.status),
+    arrival:       getCol(r, CARGO_COLS.arrival),
+    route:         getCol(r, CARGO_COLS.route),
+    carrier:       getCol(r, CARGO_COLS.carrier),
+    comment:       getCol(r, CARGO_COLS.comment),
   };
 }
 
@@ -564,7 +606,7 @@ app.post('/api/auth/change-password', changePasswordLimiter, requireAuth, async 
       if (col === -1) return res.status(500).json({ code: 'server.error', error: 'Колонка password_hash не найдена' });
 
       const auth   = await getAuth(true);
-      const sheets = google.sheets({ version: 'v4', auth });
+      const sheets = sheetsAPI({ version: 'v4', auth });
       await sheets.spreadsheets.values.update({
         spreadsheetId: LOGISTICS_SPREADSHEET_ID,
         range: `${USERS_SHEET_NAME}!${toLetterCol(col)}${user._row}`,
@@ -818,7 +860,7 @@ app.post('/api/admin/upload', requireRole('admin', 'employee'), async (req, res)
     if (tracks.length === 0) return res.status(400).json({ error: 'Список треков пуст' });
 
     const auth      = await getAuth(true);
-    const sheets    = google.sheets({ version: 'v4', auth });
+    const sheets    = sheetsAPI({ version: 'v4', auth });
     const sheetRange = process.env.SHEET_RANGE || 'Scans!A:Z';
     const sheetName  = sheetRange.split('!')[0];
 
@@ -891,21 +933,20 @@ app.post('/api/admin/upload', requireRole('admin', 'employee'), async (req, res)
   }
 });
 
-// POST /api/admin/shipments — create shipment
+// POST /api/admin/shipments — создать отгрузку.
+// Вход: { tracks: string[], cargo_number?: string, client_id?: string }
+// Действия:
+//   1. В Scans проставляем только status='отправлено' (AppSheet не перегружаем)
+//   2. Пишем привязку трек→груз в лист «Отправления» (отдельный от AppSheet)
+//   3. Добавляем строку в «送货 Логистика»: Дата(A), ID клиента(B), Номер груза(E)
 app.post('/api/admin/shipments', requireRole('admin', 'employee'), async (req, res) => {
   try {
-    if (USE_MOCK) return res.json({ message: 'Mock-режим', shipment_id: 'SHIP-MOCK', updated: 0, notFound: [], duplicates: [], alreadyShipped: [] });
+    if (USE_MOCK) return res.json({ cargo_number: req.body?.cargo_number || 'MOCK', updated: 0, notFound: [], duplicates: [], alreadyShipped: [] });
 
-    const {
-      tracks: rawTracks = [],
-      shipment_code = '',
-      shipped_at    = '',
-      total_weight  = '',
-      total_volume  = '',
-      comment  = '',
-      operator = '',
-    } = req.body;
-    const operatorName = operator || req.user?.username || 'unknown';
+    const { tracks: rawTracks = [], cargo_number = '', client_id = '' } = req.body;
+    const cargoNumber  = cargo_number.toString().trim();
+    const clientId     = client_id.toString().trim();
+    const operatorName = req.user?.username || 'unknown';
 
     const seen = new Set(); const duplicates = [];
     const tracks = rawTracks
@@ -914,32 +955,29 @@ app.post('/api/admin/shipments', requireRole('admin', 'employee'), async (req, r
 
     if (tracks.length === 0) return res.status(400).json({ error: 'Список треков пуст' });
 
-    const shipment_id = generateShipmentId();
-    const created_at  = new Date().toISOString();
-    const updateDate  = shipped_at || new Date().toLocaleDateString('en-US');
+    const created_at = new Date().toISOString();
+    const today      = new Date();
+    const dateRu     = `${String(today.getDate()).padStart(2,'0')}.${String(today.getMonth()+1).padStart(2,'0')}.${today.getFullYear()}`;
 
-    const auth      = await getAuth(true);
-    const sheets    = google.sheets({ version: 'v4', auth });
+    const auth       = await getAuth(true);
+    const sheets     = sheetsAPI({ version: 'v4', auth });
     const sheetRange = process.env.SHEET_RANGE || 'Scans!A:Z';
     const sheetName  = sheetRange.split('!')[0];
 
+    // 1) Читаем Scans, проставляем только status='отправлено'
     const readRes = await sheets.spreadsheets.values.get({
       spreadsheetId: SCANS_SPREADSHEET_ID,
       range: sheetRange,
     });
     const rows = readRes.data.values || [];
-    if (rows.length < 2) return res.status(500).json({ error: 'Таблица пустая' });
+    if (rows.length < 2) return res.status(500).json({ error: 'Таблица Scans пуста' });
 
-    const rawHeaders    = rows[0].map(h => h.toString().trim().toLowerCase().replace(/\s+/g, '_'));
-    const trackCol      = rawHeaders.indexOf('tracknumber');
-    const statusCol     = rawHeaders.indexOf('status');
-    const dateCol       = rawHeaders.indexOf('timestamp');
-    const sessionCol    = rawHeaders.indexOf('send_session');
-    const commentCol    = rawHeaders.indexOf('comment');
-    const shipmentIdCol = rawHeaders.indexOf('shipment_id');
+    const rawHeaders = rows[0].map(h => h.toString().trim().toLowerCase().replace(/\s+/g, '_'));
+    const trackCol   = rawHeaders.indexOf('tracknumber');
+    const statusCol  = rawHeaders.indexOf('status');
 
     if (trackCol === -1 || statusCol === -1) {
-      return res.status(500).json({ error: 'Не найдены колонки TrackNumber / Status' });
+      return res.status(500).json({ error: 'Не найдены колонки TrackNumber / Status в Scans' });
     }
 
     const trackIndex = {};
@@ -958,14 +996,6 @@ app.post('/api/admin/shipments', requireRole('admin', 'employee'), async (req, r
         const currentStatus = (rows[rowNum - 1][statusCol] || '').toString().trim();
         if (normStatus(currentStatus) === 'shipped') { alreadyShipped.push(track); continue; }
         batchData.push({ range: `${sheetName}!${toLetterCol(statusCol)}${rowNum}`, values: [['отправлено']] });
-        if (dateCol       !== -1) batchData.push({ range: `${sheetName}!${toLetterCol(dateCol)}${rowNum}`,       values: [[updateDate]] });
-        if (sessionCol    !== -1) batchData.push({ range: `${sheetName}!${toLetterCol(sessionCol)}${rowNum}`,    values: [[shipment_id]] });
-        if (shipmentIdCol !== -1) batchData.push({ range: `${sheetName}!${toLetterCol(shipmentIdCol)}${rowNum}`, values: [[shipment_id]] });
-        if (commentCol !== -1 && comment) {
-          const existing   = (rows[rowNum - 1][commentCol] || '').toString().trim();
-          const newComment = existing ? `${existing}; ${comment}` : comment;
-          batchData.push({ range: `${sheetName}!${toLetterCol(commentCol)}${rowNum}`, values: [[newComment]] });
-        }
         updated.push(track);
       }
     }
@@ -977,39 +1007,179 @@ app.post('/api/admin/shipments', requireRole('admin', 'employee'), async (req, r
       });
     }
 
-    await sheets.spreadsheets.values.append({
-      spreadsheetId: SCANS_SPREADSHEET_ID,
-      range: `${SHIPMENTS_SHEET_NAME}!A:J`,
-      valueInputOption: 'USER_ENTERED',
-      requestBody: { values: [[shipment_id, shipment_code, updateDate, total_weight, total_volume, updated.length, comment, operatorName, 'отправлено', created_at]] },
-    });
+    // 2) Пишем привязки трек→груз в лист «Отправления»
+    try {
+      await ensureOtpravleniyaSheet(sheets);
+      const otpRows = updated.map(track => [dateRu, cargoNumber, track, clientId, operatorName]);
+      if (otpRows.length > 0) {
+        await sheets.spreadsheets.values.append({
+          spreadsheetId: SCANS_SPREADSHEET_ID,
+          range: `${OTPRAVLENIYA_SHEET}!A:E`,
+          valueInputOption: 'USER_ENTERED',
+          requestBody: { values: otpRows },
+        });
+        invalidateOtpravleniyaCache();
+      }
+    } catch (otpErr) {
+      console.warn('[/admin/shipments POST] Отправления:', otpErr.message);
+    }
+
+    // 3) Добавляем строку в «送货 Логистика» с фиксированными адресами ячеек:
+    //    A=Дата, B=ID клиента, E=Номер груза
+    let cargoRowAdded = false;
+    try {
+      const colARes = await sheets.spreadsheets.values.get({
+        spreadsheetId: LOGISTICS_SPREADSHEET_ID,
+        range: `'${LOGISTICS_CARGO_SHEET}'!A:A`,
+      });
+      const nextRow  = (colARes.data.values || []).length + 1;
+      const logBatch = [
+        { range: `'${LOGISTICS_CARGO_SHEET}'!A${nextRow}`, values: [[dateRu]] },
+        { range: `'${LOGISTICS_CARGO_SHEET}'!B${nextRow}`, values: [[clientId]] },
+      ];
+      if (cargoNumber) {
+        logBatch.push({ range: `'${LOGISTICS_CARGO_SHEET}'!E${nextRow}`, values: [[cargoNumber]] });
+      }
+      await sheets.spreadsheets.values.batchUpdate({
+        spreadsheetId: LOGISTICS_SPREADSHEET_ID,
+        requestBody: { valueInputOption: 'RAW', data: logBatch },
+      });
+      invalidateCargoCache();
+      cargoRowAdded = true;
+    } catch (cargoErr) {
+      console.warn('[/admin/shipments POST] Логистика:', cargoErr.message);
+    }
 
     invalidateCache();
-    invalidateShipmentsCache();
 
     addOpLog({
-      ts: created_at, operator: operatorName, status: 'отправлено', send_session: shipment_id,
-      comment, shipment_id, shipment_code,
-      submitted: tracks.length + duplicates.length, updated: updated.length, notFound, duplicates, alreadyShipped,
+      ts: created_at, operator: operatorName, status: 'отправлено',
+      cargo_number: cargoNumber, client_id: clientId,
+      submitted: tracks.length + duplicates.length, updated: updated.length,
+      notFound, duplicates, alreadyShipped,
     });
 
-    res.json({ shipment_id, shipment_code, total_places: updated.length, updated: updated.length, notFound, duplicates, alreadyShipped });
+    res.json({
+      cargo_number: cargoNumber,
+      cargo_row_added: cargoRowAdded,
+      updated: updated.length,
+      notFound, duplicates, alreadyShipped,
+    });
   } catch (err) {
     console.error('[/admin/shipments POST]', err.message);
     res.status(500).json({ error: 'Ошибка: ' + err.message });
   }
 });
 
-// GET /api/admin/shipments
+// Маппинг строки «Логистики» в форму, ожидаемую фронтом отгрузок.
+// shipment_id == cargo_number — единый идентификатор груза/отгрузки.
+function cargoToShipment(c) {
+  return {
+    shipment_id:   c.cargo_number,
+    shipment_code: c.cargo_number,
+    client_id:     c.client_id    || '',
+    shipped_at:    c.date         || '',
+    arrival:       c.arrival      || '',
+    total_places:  c.places       || '',
+    total_weight:  c.weight       || '',
+    total_volume:  c.volume       || '',
+    density:       c.density      || '',
+    price_per_kg:  c.price_per_kg || '',
+    cargo_cost:    c.cargo_cost   || '',
+    insurance_pct: c.insurance_pct|| '',
+    insurance_usd: c.insurance_usd|| '',
+    packaging:     c.packaging    || '',
+    loading:       c.loading      || '',
+    total:         c.total        || '',
+    category:      c.category     || '',
+    route:         c.route        || '',
+    carrier:       c.carrier      || '',
+    status:        c.status       || '',
+    comment:       c.comment      || '',
+  };
+}
+
+// POST /api/admin/shipments/backfill-arrivals — авто-проставить дату прибытия и статус «доставлено»
+// для всех грузов до марта 2026 без даты прибытия.
+app.post('/api/admin/shipments/backfill-arrivals', requireRole('admin', 'employee'), async (req, res) => {
+  try {
+    const { data: cargos, rawHeaders } = await getAllCargo(true);
+    const auth   = await getAuth(true);
+    const sheets = sheetsAPI({ version: 'v4', auth });
+    const cutoff = new Date(2026, 2, 1); // 2026-03-01
+
+    const arrivalLetter = toLetterCol(CARGO_COLS.arrival);
+    const statusLetter  = toLetterCol(CARGO_COLS.status);
+
+    const batchData = [];
+    let count = 0;
+
+    cargos.forEach(r => {
+      const rowNum     = r._row;
+      const shippedRaw = getCol(r, CARGO_COLS.date);
+      const arrivalRaw = getCol(r, CARGO_COLS.arrival);
+      if (arrivalRaw) return;                         // уже есть — пропускаем
+      if (!shippedRaw) return;                        // нет даты отправки
+      const shipped = parseItemDate(shippedRaw);
+      if (!shipped || shipped >= cutoff) return;      // позже марта 2026
+
+      const arrDate = new Date(shipped);
+      arrDate.setDate(arrDate.getDate() + 30);
+      const dd = String(arrDate.getDate()).padStart(2, '0');
+      const mm = String(arrDate.getMonth() + 1).padStart(2, '0');
+      const yyyy = arrDate.getFullYear();
+      const arrStr = `${dd}.${mm}.${yyyy}`;
+
+      batchData.push({ range: `${LOGISTICS_CARGO_SHEET}!${arrivalLetter}${rowNum}`, values: [[arrStr]] });
+      batchData.push({ range: `${LOGISTICS_CARGO_SHEET}!${statusLetter}${rowNum}`,  values: [['доставлено']] });
+      count++;
+    });
+
+    if (!batchData.length) return res.json({ ok: true, updated: 0 });
+
+    // Разбиваем на чанки по 500 (лимит Sheets API)
+    for (let i = 0; i < batchData.length; i += 500) {
+      await sheets.spreadsheets.values.batchUpdate({
+        spreadsheetId: LOGISTICS_SPREADSHEET_ID,
+        requestBody: { valueInputOption: 'RAW', data: batchData.slice(i, i + 500) },
+      });
+    }
+
+    invalidateCargoCache();
+    res.json({ ok: true, updated: count });
+  } catch (err) {
+    console.error('[backfill-arrivals]', err.message);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// GET /api/admin/debug/cargo-headers — заголовки листа Логистика (для диагностики).
+app.get('/api/admin/debug/cargo-headers', requireRole('admin', 'employee'), async (req, res) => {
+  try {
+    const { rawHeaders, data } = await getAllCargo(true);
+    const sample = data.find(r => (r[rawHeaders.find(h => h.includes('货物编号') || h.includes('номер_груза'))] || '').includes(req.query.id || ''));
+    res.json({ headers: rawHeaders, sample: sample || data[0] || null });
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+// GET /api/admin/shipments — список отгрузок (читаем из «Логистики»).
 app.get('/api/admin/shipments', requireRole('admin', 'employee'), async (req, res) => {
   try {
-    const limit  = Math.min(parseInt(req.query.limit) || 50, 200);
+    const limit  = Math.min(parseInt(req.query.limit) || 50, 2000);
     const page   = Math.max(parseInt(req.query.page)  || 1, 1);
-    const status = req.query.status || '';
+    const status = (req.query.status || '').toLowerCase();
 
-    let data = await getAllShipments();
-    if (status) data = data.filter(s => s.status === status);
-    data = data.slice().sort((a, b) => (b.created_at || '').localeCompare(a.created_at || ''));
+    const { data: cargos } = await getAllCargo();
+    let data = cargos.map(normalizeCargoRow)
+      .filter(c => c.cargo_number)
+      .map(cargoToShipment);
+
+    if (status) data = data.filter(s => (s.status || '').toLowerCase() === status);
+    data = data.sort((a, b) => {
+      const da = parseItemDate(a.shipped_at), db = parseItemDate(b.shipped_at);
+      if (da && db) return db - da;
+      return (b.shipment_id || '').localeCompare(a.shipment_id || '');
+    });
 
     const total  = data.length;
     const offset = (page - 1) * limit;
@@ -1020,71 +1190,93 @@ app.get('/api/admin/shipments', requireRole('admin', 'employee'), async (req, re
   }
 });
 
-// GET /api/admin/shipments/:id
+// GET /api/admin/shipments/:id — детали груза + связанные треки.
+// Треки ищем в листе «Отправления» по cargo_number.
 app.get('/api/admin/shipments/:id', requireRole('admin', 'employee'), async (req, res) => {
   try {
-    const id        = req.params.id;
-    const shipments = await getAllShipments();
-    const shipment  = shipments.find(s => s.shipment_id === id);
-    if (!shipment) return res.status(404).json({ error: 'Отправка не найдена' });
+    const id = req.params.id;
+
+    const { data: cargos } = await getAllCargo();
+    const cargo = cargos.map(normalizeCargoRow).find(c => c.cargo_number === id);
+    if (!cargo) return res.status(404).json({ error: 'Груз не найден' });
+
+    const otpRows    = await getOtpravleniya();
+    const trackNums  = new Set(otpRows.filter(r => r.cargo_number === id).map(r => r.track));
 
     const { data: allData } = await getAllData();
-    const tracks = allData.filter(r =>
-      (r.shipment_id && r.shipment_id === id) ||
-      (!r.shipment_id && r.send_session === id)
-    );
+    const tracks = allData.filter(r => trackNums.has(r.track_number));
 
-    res.json({ shipment, tracks });
+    res.json({ shipment: cargoToShipment(cargo), tracks });
   } catch (err) {
     console.error('[/admin/shipments/:id GET]', err.message);
     res.status(500).json({ error: 'Ошибка: ' + err.message });
   }
 });
 
-// PATCH /api/admin/shipments/:id
+// PATCH /api/admin/shipments/:id — обновить поля груза в «Логистике».
 app.patch('/api/admin/shipments/:id', requireRole('admin', 'employee'), async (req, res) => {
   try {
     if (USE_MOCK) return res.json({ ok: true });
     const id = req.params.id;
-    const { status, comment, total_weight, total_volume } = req.body;
+    const body = req.body;
 
     const auth   = await getAuth(true);
-    const sheets = google.sheets({ version: 'v4', auth });
+    const sheets = sheetsAPI({ version: 'v4', auth });
 
     const readRes = await sheets.spreadsheets.values.get({
-      spreadsheetId: SCANS_SPREADSHEET_ID,
-      range: `${SHIPMENTS_SHEET_NAME}!A:J`,
+      spreadsheetId: LOGISTICS_SPREADSHEET_ID,
+      range: `${LOGISTICS_CARGO_SHEET}!A:AM`,
     });
     const rows = readRes.data.values || [];
-    if (rows.length < 2) return res.status(404).json({ error: 'Лист отправок пуст' });
+    if (rows.length < 2) return res.status(404).json({ error: 'Лист «Логистика» пуст' });
 
-    const headers = rows[0].map(h => h.toString().trim().toLowerCase().replace(/\s+/g, '_'));
-    const idCol   = headers.indexOf('shipment_id');
-    if (idCol === -1) return res.status(500).json({ error: 'Колонка shipment_id не найдена' });
+    const headers = rows[0].map(h => h.toString().trim().toLowerCase().replace(/ё/g, 'е').replace(/\s+/g, '_'));
+    const findCol = (...kw) => headers.findIndex(h => kw.some(k => h.includes(k)));
 
-    const rowIdx = rows.slice(1).findIndex(r => (r[idCol] || '') === id);
-    if (rowIdx === -1) return res.status(404).json({ error: 'Отправка не найдена' });
+    const cargoCol  = findCol('货物编号', 'номер_груза');
+    if (cargoCol === -1) return res.status(500).json({ error: 'Колонка номера груза не найдена' });
+
+    const rowIdx = rows.slice(1).findIndex(r => (r[cargoCol] || '').toString().trim() === id);
+    if (rowIdx === -1) return res.status(404).json({ error: 'Груз не найден' });
     const rowNum = rowIdx + 2;
 
-    const batchData = [];
-    const colUpdate = (name, value) => {
-      const col = headers.indexOf(name);
-      if (col !== -1) batchData.push({ range: `${SHIPMENTS_SHEET_NAME}!${toLetterCol(col)}${rowNum}`, values: [[value]] });
+    // Фиксированная карта: поле запроса → индекс колонки
+    const fieldColMap = {
+      shipped_at:    CARGO_COLS.date,
+      client_id:     CARGO_COLS.client_id,
+      category:      CARGO_COLS.category,
+      total_places:  CARGO_COLS.places,
+      total_weight:  CARGO_COLS.weight,
+      total_volume:  CARGO_COLS.volume,
+      price_per_kg:  CARGO_COLS.price_per_kg,
+      density:       CARGO_COLS.density,
+      cargo_cost:    CARGO_COLS.cargo_cost,
+      insurance_pct: CARGO_COLS.insurance_pct,
+      insurance_usd: CARGO_COLS.insurance_usd,
+      packaging:     CARGO_COLS.packaging,
+      loading:       CARGO_COLS.loading,
+      total:         CARGO_COLS.total,
+      status:        CARGO_COLS.status,
+      arrival:       CARGO_COLS.arrival,
+      route:         CARGO_COLS.route,
+      carrier:       CARGO_COLS.carrier,
+      comment:       CARGO_COLS.comment,
     };
 
-    if (status       !== undefined) colUpdate('status',       status);
-    if (comment      !== undefined) colUpdate('comment',      comment);
-    if (total_weight !== undefined) colUpdate('total_weight', total_weight);
-    if (total_volume !== undefined) colUpdate('total_volume', total_volume);
+    const batchData = [];
+    for (const [field, colIdx] of Object.entries(fieldColMap)) {
+      if (body[field] === undefined) continue;
+      batchData.push({ range: `${LOGISTICS_CARGO_SHEET}!${toLetterCol(colIdx)}${rowNum}`, values: [[body[field]]] });
+    }
 
     if (batchData.length > 0) {
       await sheets.spreadsheets.values.batchUpdate({
-        spreadsheetId: SCANS_SPREADSHEET_ID,
+        spreadsheetId: LOGISTICS_SPREADSHEET_ID,
         requestBody: { valueInputOption: 'USER_ENTERED', data: batchData },
       });
     }
 
-    invalidateShipmentsCache();
+    invalidateCargoCache();
     res.json({ ok: true });
   } catch (err) {
     console.error('[/admin/shipments/:id PATCH]', err.message);
@@ -1124,7 +1316,7 @@ app.post('/api/admin/users', requireRole('admin'), async (req, res) => {
 
     if (!USE_MOCK) {
       const auth   = await getAuth(true);
-      const sheets = google.sheets({ version: 'v4', auth });
+      const sheets = sheetsAPI({ version: 'v4', auth });
       await sheets.spreadsheets.values.append({
         spreadsheetId: LOGISTICS_SPREADSHEET_ID,
         range: `${USERS_SHEET_NAME}!A:K`,
@@ -1151,7 +1343,7 @@ app.patch('/api/admin/users/:username', requireRole('admin'), async (req, res) =
       const rows = await fetchUsersRows();
       const headers = rows[0].map(h => h.toString().trim().toLowerCase().replace(/\s+/g, '_'));
       const auth   = await getAuth(true);
-      const sheets = google.sheets({ version: 'v4', auth });
+      const sheets = sheetsAPI({ version: 'v4', auth });
       const batch  = [];
 
       if (active !== undefined) {
@@ -1196,7 +1388,7 @@ app.post('/api/admin/users/:username/reset-password', requireRole('admin'), asyn
       const col  = headers.indexOf('password_hash');
       if (col === -1) return res.status(500).json({ error: 'Колонка password_hash не найдена' });
       const auth   = await getAuth(true);
-      const sheets = google.sheets({ version: 'v4', auth });
+      const sheets = sheetsAPI({ version: 'v4', auth });
       await sheets.spreadsheets.values.update({
         spreadsheetId: LOGISTICS_SPREADSHEET_ID,
         range: `${USERS_SHEET_NAME}!${toLetterCol(col)}${user._row}`,

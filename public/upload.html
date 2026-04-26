@@ -91,24 +91,8 @@
 </head>
 <body>
 
-  <header class="dash-header">
-    <div class="dash-header-inner">
-      <a href="/" class="header-logo">
-        <svg width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
-          <path d="M20 7H4a2 2 0 0 0-2 2v6a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V9a2 2 0 0 0-2-2Z"/>
-          <path d="M16 7V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v2"/>
-        </svg>
-        <span>Logistics</span>
-      </a>
-      <nav class="admin-nav">
-        <a href="/admin.html"       class="admin-nav-link">Dashboard</a>
-        <a href="/shipments.html"   class="admin-nav-link">Отправки</a>
-        <a href="/upload.html"      class="admin-nav-link active">Создать отгрузку</a>
-        <a href="/history.html"     class="admin-nav-link">История</a>
-        <a href="/"                 class="admin-nav-link">Клиентский вход</a>
-      </nav>
-    </div>
-  </header>
+  <div id="adminHeader"></div>
+  <script src="admin-header.js"></script>
 
   <main class="page-content">
 
@@ -133,39 +117,25 @@
         </div>
 
         <div class="admin-card">
-          <div class="card-title">Параметры отправки</div>
-          <div style="display:grid;gap:10px">
+          <div class="card-title">Параметры отгрузки</div>
+          <div style="display:flex;flex-direction:column;gap:12px">
             <div>
-              <label class="form-label">Код отправки <span style="color:var(--red)">*</span></label>
-              <input class="input-field" type="text" id="shipmentCode" placeholder="Например: AVEX-2026-04" />
+              <label class="form-label">ID клиента</label>
+              <input class="input-field" type="text" id="clientId" placeholder="Например: WAY258" autocapitalize="characters" spellcheck="false" />
             </div>
             <div>
-              <label class="form-label">Дата отправки</label>
-              <input class="input-field" type="date" id="shipDate" />
-            </div>
-            <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
-              <div>
-                <label class="form-label">Вес, кг (необязательно)</label>
-                <input class="input-field" type="number" step="0.01" id="totalWeight" placeholder="0.00" />
-              </div>
-              <div>
-                <label class="form-label">Объём, м³ (необязательно)</label>
-                <input class="input-field" type="number" step="0.001" id="totalVolume" placeholder="0.000" />
-              </div>
-            </div>
-            <div>
-              <label class="form-label">Комментарий (необязательно)</label>
-              <input class="input-field" type="text" id="commentField" placeholder="Авиа, EMS, и т.д." />
-            </div>
-            <div>
-              <label class="form-label">Оператор (необязательно)</label>
-              <input class="input-field" type="text" id="operatorField" placeholder="Имя сотрудника" />
+              <label class="form-label">Номер груза <span style="font-size:11px;color:var(--text-3);font-weight:400">(необязательно)</span></label>
+              <input class="input-field" type="text" id="cargoNumber" placeholder="Например: WAY305-1-1004-1" autocapitalize="characters" spellcheck="false" />
+              <p style="font-size:11px;color:var(--text-3);margin-top:6px;line-height:1.5">
+                Запись появится в «送货 Логистика»: дата, ID клиента и номер груза.
+                Остальные параметры (вес, объём, цена, статус) сотрудник дозаполнит вручную.
+              </p>
             </div>
           </div>
         </div>
 
         <button class="btn-submit" id="submitBtn">
-          Создать отправку
+          Создать отгрузку
         </button>
       </div>
 
