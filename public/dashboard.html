@@ -4,6 +4,12 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>FreewayChina — Кабинет клиента</title>
+  <link rel="manifest" href="/manifest.json" />
+  <link rel="apple-touch-icon" href="/icon-192.png" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+  <meta name="apple-mobile-web-app-title" content="FreewayChina" />
+  <meta name="theme-color" content="#2E86DE" />
   <link rel="preconnect" href="https://api.fontshare.com" crossorigin />
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
@@ -843,5 +849,114 @@
 
   <script src="utils.js"></script>
   <script src="dashboard.js"></script>
+
+  <!-- Push notification banner + SW registration -->
+  <script>
+  (function () {
+    // Banner only if Notification API is supported
+    if (!('Notification' in window) || !('serviceWorker' in navigator)) return;
+
+    // Register Service Worker
+    navigator.serviceWorker.register('/sw.js').catch(() => {});
+
+    // Don't show banner if already granted or denied
+    if (Notification.permission !== 'default') return;
+
+    // Show banner after a short delay so the page loads first
+    setTimeout(showPushBanner, 2500);
+  })();
+
+  function showPushBanner() {
+    if (document.getElementById('pushBanner')) return;
+
+    const banner = document.createElement('div');
+    banner.id = 'pushBanner';
+    banner.style.cssText = [
+      'position:fixed;bottom:20px;left:50%;transform:translateX(-50%)',
+      'background:#0C1528;color:#fff;border:1px solid rgba(46,134,222,.5)',
+      'border-radius:14px;padding:14px 18px;display:flex;align-items:center;gap:12px',
+      'box-shadow:0 8px 32px rgba(0,0,0,.4);z-index:9999;max-width:420px;width:calc(100% - 32px)',
+      'animation:slideUp .3s ease',
+    ].join(';');
+
+    banner.innerHTML = `
+      <style>@keyframes slideUp{from{opacity:0;transform:translateX(-50%) translateY(16px)}to{opacity:1;transform:translateX(-50%) translateY(0)}}</style>
+      <svg width="22" height="22" fill="none" stroke="#2E86DE" stroke-width="2" viewBox="0 0 24 24" style="flex-shrink:0">
+        <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/>
+        <path d="M13.73 21a2 2 0 0 1-3.46 0"/>
+      </svg>
+      <div style="flex:1;min-width:0">
+        <div style="font-size:14px;font-weight:600;margin-bottom:2px">Включить уведомления</div>
+        <div style="font-size:12px;color:rgba(255,255,255,.6)">Узнавайте о статусе грузов сразу</div>
+      </div>
+      <button id="pushAllow" style="background:#2E86DE;color:#fff;border:none;border-radius:8px;padding:8px 14px;font-size:13px;font-weight:600;cursor:pointer;flex-shrink:0">Разрешить</button>
+      <button id="pushDismiss" style="background:none;border:none;color:rgba(255,255,255,.5);cursor:pointer;padding:4px;flex-shrink:0">
+        <svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24">
+          <line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>
+        </svg>
+      </button>`;
+
+    document.body.appendChild(banner);
+
+    document.getElementById('pushDismiss').onclick = () => banner.remove();
+    document.getElementById('pushAllow').onclick   = () => {
+      banner.remove();
+      subscribePush();
+    };
+  }
+
+  async function subscribePush() {
+    try {
+      const permission = await Notification.requestPermission();
+      if (permission !== 'granted') return;
+
+      const reg = await navigator.serviceWorker.ready;
+
+      // Fetch public VAPID key
+      const keyRes = await fetch('/api/push/vapid-key');
+      if (!keyRes.ok) return;
+      const { key } = await keyRes.json();
+
+      const sub = await reg.pushManager.subscribe({
+        userVisibleOnly: true,
+        applicationServerKey: urlBase64ToUint8Array(key),
+      });
+
+      await fetch('/api/push/subscribe', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ subscription: sub.toJSON() }),
+      });
+    } catch (e) {
+      console.warn('[push] Ошибка подписки:', e);
+    }
+  }
+
+  function urlBase64ToUint8Array(base64String) {
+    const padding = '='.repeat((4 - base64String.length % 4) % 4);
+    const base64  = (base64String + padding).replace(/-/g, '+').replace(/_/g, '/');
+    const raw     = atob(base64);
+    return Uint8Array.from([...raw].map(c => c.charCodeAt(0)));
+  }
+
+  // Auto-subscribe if permission already granted (e.g. after re-opening from home screen)
+  window.addEventListener('load', async () => {
+    if (Notification.permission === 'granted' && 'serviceWorker' in navigator) {
+      try {
+        const reg = await navigator.serviceWorker.ready;
+        const existing = await reg.pushManager.getSubscription();
+        if (!existing) { subscribePush(); return; }
+        // Re-register existing subscription with server (in case server restarted)
+        const keyRes = await fetch('/api/push/vapid-key');
+        if (!keyRes.ok) return;
+        await fetch('/api/push/subscribe', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ subscription: existing.toJSON() }),
+        });
+      } catch {}
+    }
+  });
+  </script>
 </body>
 </html>

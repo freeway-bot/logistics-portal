@@ -8,6 +8,7 @@ const jwt          = require('jsonwebtoken');
 const { sheets: sheetsAPI } = require('@googleapis/sheets');
 const { GoogleAuth } = require('google-auth-library');
 const path         = require('path');
+const webpush      = require('web-push');
 
 const app  = express();
 // Railway / Netlify прокси: доверять X-Forwarded-For,
@@ -22,6 +23,22 @@ const IS_PROD    = process.env.NODE_ENV === 'production';
 const SCANS_SPREADSHEET_ID     = process.env.SCANS_SPREADSHEET_ID     || process.env.SPREADSHEET_ID;
 const LOGISTICS_SPREADSHEET_ID = process.env.LOGISTICS_SPREADSHEET_ID || process.env.SPREADSHEET_ID;
 const LOGISTICS_CARGO_SHEET    = process.env.LOGISTICS_CARGO_SHEET    || '送货 Логистика';
+
+// ─── Web Push (VAPID) ─────────────────────────────────────────────────────────
+
+const VAPID_PUBLIC_KEY  = process.env.VAPID_PUBLIC_KEY;
+const VAPID_PRIVATE_KEY = process.env.VAPID_PRIVATE_KEY;
+const VAPID_EMAIL       = process.env.VAPID_EMAIL || 'mailto:admin@freewaychina.com';
+const PUSH_SUBS_SHEET   = 'PushSubs';
+
+// client_id → Map<endpoint, subscription>
+const pushSubsCache = new Map();
+
+if (VAPID_PUBLIC_KEY && VAPID_PRIVATE_KEY) {
+  webpush.setVapidDetails(VAPID_EMAIL, VAPID_PUBLIC_KEY, VAPID_PRIVATE_KEY);
+} else {
+  console.warn('  ⚠  VAPID_PUBLIC_KEY / VAPID_PRIVATE_KEY не заданы — push-уведомления отключены');
+}
 
 const rawOrigins = process.env.ALLOWED_ORIGINS || '*';
 app.use(cors({
@@ -921,6 +938,31 @@ app.post('/api/admin/upload', requireRole('admin', 'employee'), async (req, res)
 
     invalidateCache();
 
+    // Push-уведомления клиентам при поступлении посылок на склад
+    if (normStatus(status) === 'warehouse' && VAPID_PUBLIC_KEY) {
+      const clientCol = rawHeaders.indexOf('clientid');
+      if (clientCol !== -1) {
+        const clientTracks = new Map();
+        for (const track of updated) {
+          const rowNums = trackIndex[track];
+          if (!rowNums) continue;
+          const clientId = (rows[rowNums[0] - 1][clientCol] || '').toString().trim();
+          if (!clientId) continue;
+          if (!clientTracks.has(clientId)) clientTracks.set(clientId, []);
+          clientTracks.get(clientId).push(track);
+        }
+        for (const [clientId, list] of clientTracks) {
+          const n     = list.length;
+          const title = n === 1 ? '📦 Посылка прибыла на склад' : `📦 ${n} посылки прибыли на склад`;
+          const body  = n === 1
+            ? `Трек: ${list[0]}`
+            : `${list.slice(0, 2).join(', ')}${n > 2 ? ` и ещё ${n - 2}` : ''}`;
+          sendPushToClient(clientId, title, body, { url: '/dashboard.html', tag: 'parcels-arrived' })
+            .catch(() => {});
+        }
+      }
+    }
+
     addOpLog({
       ts: new Date().toISOString(), operator: operatorName, status, send_session, comment,
       submitted: tracks.length + duplicates.length, updated: updated.length, notFound, duplicates, alreadyShipped,
@@ -1277,6 +1319,24 @@ app.patch('/api/admin/shipments/:id', requireRole('admin', 'employee'), async (r
     }
 
     invalidateCargoCache();
+
+    // Push-уведомление клиенту при изменении статуса
+    if (body.status !== undefined) {
+      const row      = rows[rowIdx + 1];
+      const clientId = (row[CARGO_COLS.client_id] || '').toString().trim();
+      if (clientId) {
+        const statusLabels = {
+          'отправлено':  { title: 'Груз отправлен', body: `Груз ${id} отправлен` },
+          'доставлено':  { title: 'Груз доставлен', body: `Груз ${id} прибыл. Можете забрать.` },
+          'на складе':   { title: 'Груз на складе', body: `Груз ${id} принят на склад` },
+        };
+        const statusKey = body.status.toLowerCase();
+        const msg = statusLabels[statusKey] || { title: 'Статус обновлён', body: `Груз ${id}: ${body.status}` };
+        sendPushToClient(clientId, msg.title, msg.body, { url: '/dashboard.html', tag: `cargo-${id}` })
+          .catch(() => {});
+      }
+    }
+
     res.json({ ok: true });
   } catch (err) {
     console.error('[/admin/shipments/:id PATCH]', err.message);
@@ -1403,6 +1463,193 @@ app.post('/api/admin/users/:username/reset-password', requireRole('admin'), asyn
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
+// ── Push notifications ────────────────────────────────────────────────────────
+
+async function ensurePushSubsSheet(sheetsClient) {
+  try {
+    await sheetsClient.spreadsheets.values.get({
+      spreadsheetId: LOGISTICS_SPREADSHEET_ID,
+      range: `${PUSH_SUBS_SHEET}!A1`,
+    });
+  } catch {
+    await sheetsClient.spreadsheets.batchUpdate({
+      spreadsheetId: LOGISTICS_SPREADSHEET_ID,
+      requestBody: { requests: [{ addSheet: { properties: { title: PUSH_SUBS_SHEET } } }] },
+    });
+    await sheetsClient.spreadsheets.values.update({
+      spreadsheetId: LOGISTICS_SPREADSHEET_ID,
+      range: `${PUSH_SUBS_SHEET}!A1:E1`,
+      valueInputOption: 'RAW',
+      requestBody: { values: [['client_id', 'endpoint', 'p256dh', 'auth', 'created_at']] },
+    });
+  }
+}
+
+async function loadPushSubs() {
+  if (USE_MOCK || !VAPID_PUBLIC_KEY) return;
+  try {
+    const auth   = await getAuth(false);
+    const sheets = sheetsAPI({ version: 'v4', auth });
+    const res    = await sheets.spreadsheets.values.get({
+      spreadsheetId: LOGISTICS_SPREADSHEET_ID,
+      range: `${PUSH_SUBS_SHEET}!A:E`,
+    });
+    pushSubsCache.clear();
+    const rows = (res.data.values || []).slice(1);
+    for (const [clientId, endpoint, p256dh, auth_key] of rows) {
+      if (!clientId || !endpoint) continue;
+      if (!pushSubsCache.has(clientId)) pushSubsCache.set(clientId, new Map());
+      pushSubsCache.get(clientId).set(endpoint, { endpoint, keys: { p256dh, auth: auth_key } });
+    }
+    console.log(`  [push] Загружено подписок: ${rows.length}`);
+  } catch (e) {
+    console.warn('[push] Не удалось загрузить подписки:', e.message);
+  }
+}
+
+async function sendPushToClient(clientId, title, body, extra = {}) {
+  if (!VAPID_PUBLIC_KEY) return;
+  const subs = pushSubsCache.get(clientId);
+  if (!subs || subs.size === 0) return;
+  const payload = JSON.stringify({ title, body, ...extra });
+  const stale   = [];
+  for (const [endpoint, sub] of subs) {
+    try {
+      await webpush.sendNotification(sub, payload);
+    } catch (e) {
+      if (e.statusCode === 410 || e.statusCode === 404) stale.push(endpoint);
+      else console.warn('[push] send error:', e.message);
+    }
+  }
+  stale.forEach(ep => subs.delete(ep));
+}
+
+// GET /api/push/vapid-key — публичный ключ VAPID для фронтенда
+app.get('/api/push/vapid-key', (_req, res) => {
+  if (!VAPID_PUBLIC_KEY) return res.status(503).json({ error: 'Push не настроен' });
+  res.json({ key: VAPID_PUBLIC_KEY });
+});
+
+// POST /api/push/subscribe — сохранить подписку (только для авторизованных клиентов)
+app.post('/api/push/subscribe', requireAuth, async (req, res) => {
+  if (!VAPID_PUBLIC_KEY) return res.status(503).json({ error: 'Push не настроен' });
+  const { subscription } = req.body;
+  if (!subscription?.endpoint) return res.status(400).json({ error: 'Неверная подписка' });
+
+  const clientId = req.user.client_id || req.user.username;
+  if (!pushSubsCache.has(clientId)) pushSubsCache.set(clientId, new Map());
+  pushSubsCache.get(clientId).set(subscription.endpoint, subscription);
+
+  if (!USE_MOCK) {
+    try {
+      const auth   = await getAuth(true);
+      const sheets = sheetsAPI({ version: 'v4', auth });
+      await ensurePushSubsSheet(sheets);
+      const existing = await sheets.spreadsheets.values.get({
+        spreadsheetId: LOGISTICS_SPREADSHEET_ID,
+        range: `${PUSH_SUBS_SHEET}!B:B`,
+      });
+      const endpoints = (existing.data.values || []).flat();
+      if (!endpoints.includes(subscription.endpoint)) {
+        await sheets.spreadsheets.values.append({
+          spreadsheetId: LOGISTICS_SPREADSHEET_ID,
+          range: `${PUSH_SUBS_SHEET}!A:E`,
+          valueInputOption: 'RAW',
+          requestBody: {
+            values: [[
+              clientId,
+              subscription.endpoint,
+              subscription.keys?.p256dh || '',
+              subscription.keys?.auth   || '',
+              new Date().toISOString(),
+            ]],
+          },
+        });
+      }
+    } catch (e) {
+      console.warn('[push] Ошибка сохранения подписки:', e.message);
+    }
+  }
+
+  res.json({ ok: true });
+});
+
+// POST /api/admin/push/send — вручную отправить уведомление клиенту (admin/employee)
+app.post('/api/admin/push/send', requireRole('admin', 'employee'), async (req, res) => {
+  const { client_id, title, body } = req.body;
+  if (!client_id || !title) return res.status(400).json({ error: 'client_id и title обязательны' });
+  await sendPushToClient(client_id, title, body || '');
+  res.json({ ok: true });
+});
+
+// ── Polling Google Sheets → push при новых посылках на складе ────────────────
+
+const SCAN_POLL_MS = 2 * 60 * 1000; // каждые 2 минуты
+let scanBaseline   = null;           // кол-во строк при старте (не уведомляем старые)
+
+async function initScanBaseline() {
+  if (!VAPID_PUBLIC_KEY || USE_MOCK) return;
+  try {
+    const auth   = await getAuth(false);
+    const sheets = sheetsAPI({ version: 'v4', auth });
+    const res    = await sheets.spreadsheets.values.get({
+      spreadsheetId: SCANS_SPREADSHEET_ID,
+      range: 'Scans!A:A',
+    });
+    scanBaseline = Math.max(0, (res.data.values || []).length - 1);
+    console.log(`  [push-poll] Базовая строка: ${scanBaseline}`);
+  } catch (e) {
+    console.warn('[push-poll] Не удалось инициализировать baseline:', e.message);
+  }
+}
+
+async function pollScansAndNotify() {
+  if (!VAPID_PUBLIC_KEY || USE_MOCK || scanBaseline === null) return;
+  try {
+    const auth   = await getAuth(false);
+    const sheets = sheetsAPI({ version: 'v4', auth });
+    const range  = process.env.SHEET_RANGE || 'Scans!A:Z';
+    const res    = await sheets.spreadsheets.values.get({ spreadsheetId: SCANS_SPREADSHEET_ID, range });
+    const rows   = res.data.values || [];
+    if (rows.length < 2) return;
+
+    const headers   = rows[0].map(h => h.toString().trim().toLowerCase().replace(/\s+/g, '_'));
+    const trackCol  = headers.indexOf('tracknumber');
+    const statusCol = headers.indexOf('status');
+    const clientCol = headers.indexOf('clientid');
+    if (trackCol === -1 || statusCol === -1 || clientCol === -1) return;
+
+    const dataRows  = rows.slice(1);
+    const total     = dataRows.length;
+    if (total <= scanBaseline) return;
+
+    // Только новые строки — те что появились после последнего опроса
+    const clientTracks = new Map();
+    for (const row of dataRows.slice(scanBaseline)) {
+      const status   = (row[statusCol] || '').toString().trim();
+      const clientId = (row[clientCol] || '').toString().trim();
+      const track    = (row[trackCol]  || '').toString().trim();
+      if (!clientId || !track || normStatus(status) !== 'warehouse') continue;
+      if (!clientTracks.has(clientId)) clientTracks.set(clientId, []);
+      clientTracks.get(clientId).push(track);
+    }
+
+    for (const [clientId, list] of clientTracks) {
+      const n     = list.length;
+      const title = n === 1 ? '📦 Посылка прибыла на склад' : `📦 ${n} посылки прибыли на склад`;
+      const body  = n === 1
+        ? `Трек: ${list[0]}`
+        : `${list.slice(0, 2).join(', ')}${n > 2 ? ` и ещё ${n - 2}` : ''}`;
+      await sendPushToClient(clientId, title, body, { url: '/dashboard.html', tag: 'parcels-arrived' });
+      console.log(`[push-poll] → ${clientId}: ${n} посылок`);
+    }
+
+    scanBaseline = total;
+  } catch (e) {
+    console.warn('[push-poll] Ошибка:', e.message);
+  }
+}
+
 // ── Health ────────────────────────────────────────────────────────────────────
 
 app.get('/api/health', (_req, res) => res.json({ status: 'ok', mock: USE_MOCK, cached: !!cache.data }));
@@ -1416,4 +1663,6 @@ app.listen(PORT, () => {
   if (JWT_SECRET === 'dev-secret-change-in-prod') {
     console.warn('  ⚠  JWT_SECRET не задан — используется дефолтный ключ (небезопасно в проде)\n');
   }
+  loadPushSubs();
+  initScanBaseline().then(() => setInterval(pollScansAndNotify, SCAN_POLL_MS));
 });
