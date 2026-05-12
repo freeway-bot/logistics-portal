@@ -1584,7 +1584,7 @@ app.post('/api/admin/push/send', requireRole('admin', 'employee'), async (req, r
 
 // ── Polling Google Sheets → push при новых посылках на складе ────────────────
 
-const SCAN_POLL_MS = 2 * 60 * 1000; // каждые 2 минуты
+const SCAN_POLL_MS = 30 * 60 * 1000; // каждые 30 минут
 let scanBaseline   = null;           // кол-во строк при старте (не уведомляем старые)
 
 async function initScanBaseline() {
