@@ -5,7 +5,14 @@
 [build.environment]
   NODE_VERSION = "18"
 
-# SPA fallback
+# lk.freewaychina.com — SPA fallback для клиентского кабинета
+[[redirects]]
+  from = "/*"
+  to = "/client.html"
+  status = 200
+  conditions = {Host = ["lk.freewaychina.com"]}
+
+# Основной домен — SPA fallback для admin-панели
 [[redirects]]
   from = "/*"
   to = "/index.html"

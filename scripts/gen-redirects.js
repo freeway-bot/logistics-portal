@@ -13,6 +13,7 @@ if (!railwayUrl) {
   process.exit(0);
 }
 
-const content = `/api/*  ${railwayUrl}/api/:splat  200\n/*  /index.html  200\n`;
+// SPA fallback → client.html (этот сайт lk.freewaychina.com — только для клиентов)
+const content = `/api/*  ${railwayUrl}/api/:splat  200\n/*      /client.html           200\n`;
 fs.writeFileSync(path.join(__dirname, '../public/_redirects'), content);
-console.log(`[gen-redirects] Written: /api/* → ${railwayUrl}/api/:splat + SPA fallback`);
+console.log(`[gen-redirects] Written: /api/* → ${railwayUrl}/api/:splat  +  SPA → client.html`);
