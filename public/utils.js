@@ -5,18 +5,21 @@
 
 const STATUS_MAP = {
   'на складе':'warehouse','склад':'warehouse','получено':'warehouse','в наличии':'warehouse',
-  'упаковано':'packed','упаковка':'packed','запакован':'packed',
-  'отправлено':'shipped','доставлено':'shipped','выслано':'shipped','в пути':'shipped',
+  'упаковано':'warehouse','упаковка':'warehouse','запакован':'warehouse',
+  'отправлено':'shipped','выслано':'shipped','в пути':'shipped',
+  'доставлено':'delivered','получен':'delivered',
   'warehouse':'warehouse','in stock':'warehouse','stock':'warehouse','received':'warehouse',
-  'packed':'packed','pack':'packed','packaging':'packed',
-  'shipped':'shipped','sent':'shipped','delivered':'shipped',
-  '在仓库':'warehouse','仓库':'warehouse','已收到':'warehouse',
-  '已打包':'packed','打包':'packed',
+  'packed':'warehouse','pack':'warehouse','packaging':'warehouse',
+  'shipped':'shipped','sent':'shipped',
+  'delivered':'delivered',
+  '在仓库':'warehouse','仓库':'warehouse','已收到':'delivered',
+  '已打包':'warehouse','打包':'warehouse',
   '已发货':'shipped','已发出':'shipped','运输中':'shipped',
+  '已签收':'delivered',
 };
 
-const STATUS_LABELS  = { warehouse:'На складе', packed:'Упаковано', shipped:'Отправлено' };
-const STATUS_CLASSES = { warehouse:'badge-warehouse', packed:'badge-packed', shipped:'badge-shipped' };
+const STATUS_LABELS  = { warehouse:'На складе', shipped:'Отправлено', delivered:'Доставлено' };
+const STATUS_CLASSES = { warehouse:'badge-warehouse', shipped:'badge-shipped', delivered:'badge-delivered' };
 
 function normStatus(s) { return STATUS_MAP[(s||'').toLowerCase().trim()] || 'other'; }
 function statusLabel(s) { return STATUS_LABELS[normStatus(s)] || s || '—'; }

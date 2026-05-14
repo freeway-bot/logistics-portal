@@ -22,11 +22,11 @@ const el = {
   clientIdDisplay: $('clientIdDisplay'),
   totalCount:      $('totalCount'),
   warehouseCount:  $('warehouseCount'),
-  packedCount:     $('packedCount'),
+  deliveredCount:  $('deliveredCount'),
   shippedCount:    $('shippedCount'),
   cntAll:          $('cntAll'),
   cntWarehouse:    $('cntWarehouse'),
-  cntPacked:       $('cntPacked'),
+  cntDelivered:    $('cntDelivered'),
   cntShipped:      $('cntShipped'),
   searchInput:     $('searchInput'),
   sortSelect:      $('sortSelect'),
@@ -582,16 +582,16 @@ function exportCargoCSV() {
 // ─── Stats ────────────────────────────────────────────────────────────────────
 
 function updateStats() {
-  const c = { warehouse: 0, packed: 0, shipped: 0 };
+  const c = { warehouse: 0, shipped: 0, delivered: 0 };
   allItems.forEach(item => { const n = normStatus(item.status); if (n in c) c[n]++; });
 
   el.totalCount.textContent     = allItems.length;
   el.warehouseCount.textContent = c.warehouse;
-  el.packedCount.textContent    = c.packed;
+  el.deliveredCount.textContent = c.delivered;
   el.shippedCount.textContent   = c.shipped;
   el.cntAll.textContent         = allItems.length;
   el.cntWarehouse.textContent   = c.warehouse;
-  el.cntPacked.textContent      = c.packed;
+  el.cntDelivered.textContent   = c.delivered;
   el.cntShipped.textContent     = c.shipped;
   const stcP = document.getElementById('stcParcels');
   if (stcP) stcP.textContent = allItems.length;
@@ -662,37 +662,49 @@ function render() {
 
 // ─── Table ────────────────────────────────────────────────────────────────────
 
+function photoBtn(url, label) {
+  if (!url) return '<span style="color:var(--text-3);font-size:12px">—</span>';
+  return `<button class="photo-icon-btn" onclick="openPhotoModal('${esc(url)}')" title="${esc(label)}">
+    <svg width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+      <rect x="3" y="3" width="18" height="18" rx="2"/>
+      <circle cx="8.5" cy="8.5" r="1.5"/>
+      <polyline points="21 15 16 10 5 21"/>
+    </svg>
+  </button>`;
+}
+
+function trackCell(item) {
+  const num = item.track_number;
+  if (!num) return '<div class="cell-track"><span class="cell-track-num">—</span></div>';
+  const st = normStatus(item.status);
+  const trackHtml = (st === 'shipped' || st === 'delivered')
+    ? `<a class="cell-track-num track-link" href="https://t.17track.net/ru#nums=${esc(num)}" target="_blank" rel="noopener noreferrer" title="Отследить">${esc(num)}</a>`
+    : `<span class="cell-track-num">${esc(num)}</span>`;
+  return `<div class="cell-track">
+    ${trackHtml}
+    <button class="copy-sm" onclick="copyText('${esc(num)}','${esc(num)}')" title="Скопировать">
+      <svg width="11" height="11" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+        <rect x="9" y="9" width="13" height="13" rx="2"/>
+        <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/>
+      </svg>
+    </button>
+  </div>`;
+}
+
 function renderTable(items, total, totalPages) {
   el.tableBody.innerHTML = items.map(item => {
-    const photos = getPhotos(item);
-    const photoCells = photos.map(([url, lbl]) => `
-      <button class="photo-icon-btn" onclick="openPhotoModal('${esc(url)}')" title="${esc(lbl)}">
-        <svg width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
-          <rect x="3" y="3" width="18" height="18" rx="2"/>
-          <circle cx="8.5" cy="8.5" r="1.5"/>
-          <polyline points="21 15 16 10 5 21"/>
-        </svg>
-      </button>`).join('');
+    const photo1 = toDirectUrl(item.photo_1);
+    const photo2 = toDirectUrl(item.photo_2);
 
     return `<tr>
-      <td>
-        <div class="cell-track">
-          <span class="cell-track-num">${esc(item.track_number||'—')}</span>
-          ${item.track_number
-            ? `<button class="copy-sm" onclick="copyText('${esc(item.track_number)}','${esc(item.track_number)}')" title="Скопировать">
-                <svg width="11" height="11" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
-                  <rect x="9" y="9" width="13" height="13" rx="2"/>
-                  <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/>
-                </svg>
-              </button>` : ''}
-        </div>
-      </td>
+      <td>${trackCell(item)}</td>
       <td class="cell-cat"  title="${esc(item.category||'')}">${esc(item.category||'—')}</td>
       <td><span class="badge ${statusClass(item.status)}">${esc(statusLabel(item.status))}</span></td>
       <td class="cell-box">${esc(item.box_number||'—')}</td>
       <td class="cell-date">${esc(fmtDate(item.date))}</td>
       <td class="cell-comment" title="${esc(item.comment||'')}">${esc(item.comment||'—')}</td>
-      <td><div class="cell-photos">${photoCells||'<span style="color:var(--text-3);font-size:12px">—</span>'}</div></td>
+      <td><div class="cell-photos">${photoBtn(photo1, 'Фото товара')}</div></td>
+      <td><div class="cell-photos">${photoBtn(photo2, 'Этикетка')}</div></td>
     </tr>`;
   }).join('');
 
@@ -713,20 +725,45 @@ function renderTable(items, total, totalPages) {
 
 function renderCards(items, total, totalPages) {
   el.cardsGrid.innerHTML = items.map(item => {
-    const fields = getCardFields(item, false);
-    const photos = getPhotos(item);
+    const fields  = getCardFields(item, false);
+    const photo1  = toDirectUrl(item.photo_1);
+    const photo2  = toDirectUrl(item.photo_2);
+    const st      = normStatus(item.status);
+    const num     = item.track_number;
+    const isActive = st === 'shipped' || st === 'delivered';
+
+    const trackEl = num
+      ? (isActive
+          ? `<a class="card-track-num track-link" href="https://t.17track.net/ru#nums=${esc(num)}" target="_blank" rel="noopener noreferrer" title="Отследить">${esc(num)}</a>`
+          : `<span class="card-track-num" title="${esc(num)}">${esc(num)}</span>`)
+      : `<span class="card-track-num">—</span>`;
+
+    const cardPhotoBtn = (url, lbl) => !url ? '' : `
+      <button class="card-photo-btn" onclick="openPhotoModal('${esc(url)}')">
+        <svg width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+          <rect x="3" y="3" width="18" height="18" rx="2"/>
+          <circle cx="8.5" cy="8.5" r="1.5"/>
+          <polyline points="21 15 16 10 5 21"/>
+        </svg>
+        ${esc(lbl)}
+      </button>`;
+
+    const photosHtml = (photo1 || photo2) ? `
+      <div class="card-photos">
+        ${cardPhotoBtn(photo1, 'Фото товара')}
+        ${cardPhotoBtn(photo2, 'Этикетка')}
+      </div>` : '';
 
     return `<div class="card">
       <div class="card-head">
         <div class="card-track-row">
-          <span class="card-track-num" title="${esc(item.track_number||'')}">${esc(item.track_number||'—')}</span>
-          ${item.track_number
-            ? `<button class="copy-btn" onclick="copyText('${esc(item.track_number)}','${esc(item.track_number)}')" title="Скопировать">
-                <svg width="12" height="12" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
-                  <rect x="9" y="9" width="13" height="13" rx="2"/>
-                  <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/>
-                </svg>
-              </button>` : ''}
+          ${trackEl}
+          ${num ? `<button class="copy-btn" onclick="copyText('${esc(num)}','${esc(num)}')" title="Скопировать">
+            <svg width="12" height="12" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+              <rect x="9" y="9" width="13" height="13" rx="2"/>
+              <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/>
+            </svg>
+          </button>` : ''}
         </div>
         <span class="badge ${statusClass(item.status)}">${esc(statusLabel(item.status))}</span>
       </div>
@@ -738,18 +775,7 @@ function renderCards(items, total, totalPages) {
               <span class="field-val">${esc(v)}</span>
             </div>`).join('')}
         </div>` : ''}
-      ${photos.length ? `
-        <div class="card-photos">
-          ${photos.map(([url,lbl]) => `
-            <button class="card-photo-btn" onclick="openPhotoModal('${esc(url)}')">
-              <svg width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
-                <rect x="3" y="3" width="18" height="18" rx="2"/>
-                <circle cx="8.5" cy="8.5" r="1.5"/>
-                <polyline points="21 15 16 10 5 21"/>
-              </svg>
-              ${esc(lbl)}
-            </button>`).join('')}
-        </div>` : ''}
+      ${photosHtml}
     </div>`;
   }).join('');
 

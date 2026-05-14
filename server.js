@@ -449,8 +449,9 @@ function normalizeCargoRow(r) {
 
 const STATUS_MAP_NORM = {
   'на складе':'warehouse','склад':'warehouse','received':'warehouse','in stock':'warehouse','warehouse':'warehouse','在仓库':'warehouse','仓库':'warehouse',
-  'упаковано':'packed','packed':'packed','pack':'packed','已打包':'packed',
-  'отправлено':'shipped','shipped':'shipped','sent':'shipped','delivered':'shipped','已发货':'shipped',
+  'упаковано':'warehouse','packed':'warehouse','pack':'warehouse','已打包':'warehouse',
+  'отправлено':'shipped','shipped':'shipped','sent':'shipped','已发货':'shipped','运输中':'shipped',
+  'доставлено':'delivered','delivered':'delivered','получен':'delivered','получено':'delivered','已收到':'delivered','已签收':'delivered',
 };
 
 function normStatus(s) { return STATUS_MAP_NORM[(s||'').toLowerCase().trim()] || 'other'; }
@@ -655,6 +656,31 @@ app.get('/api/client/parcels', requireRole('client', 'admin', 'employee'), async
     const { data: allData } = await getAllData();
 
     let data = allData.filter(r => (r.client_id||'').toLowerCase() === clientId.toLowerCase());
+
+    // Cross-reference: mark parcels as "доставлено" if their cargo has an arrival date
+    if (!USE_MOCK) {
+      try {
+        const [otpData, cargoRes] = await Promise.all([getOtpravleniya(), getAllCargo()]);
+        const trackToCargo = new Map();
+        otpData.forEach(r => {
+          if (r.track && r.cargo_number) trackToCargo.set(r.track.toLowerCase(), r.cargo_number.toLowerCase());
+        });
+        const cargoArrived = new Set();
+        (cargoRes.data || []).forEach(r => {
+          const norm = normalizeCargoRow(r);
+          if (norm.cargo_number && norm.arrival) cargoArrived.add(norm.cargo_number.toLowerCase());
+        });
+        data = data.map(p => {
+          const track = (p.track_number || '').toLowerCase();
+          const cargoNum = trackToCargo.get(track);
+          if (cargoNum && cargoArrived.has(cargoNum)) return { ...p, status: 'доставлено' };
+          return p;
+        });
+      } catch (e) {
+        console.warn('[/client/parcels] delivery cross-ref failed:', e.message);
+      }
+    }
+
     if (status) data = data.filter(r => normStatus(r.status) === status);
     data = sortData(data, sort_by, sort_order);
 
