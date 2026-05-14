@@ -9,10 +9,11 @@
   <meta name="apple-mobile-web-app-capable" content="yes" />
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
   <meta name="apple-mobile-web-app-title" content="FreewayChina" />
-  <meta name="theme-color" content="#2E86DE" />
+  <meta name="theme-color" content="#0A0A0A" />
   <link rel="preconnect" href="https://api.fontshare.com" crossorigin />
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;600&family=Manrope:wght@400;500;600;700;800&display=swap" />
   <link rel="stylesheet" href="style.css" />
   <script src="https://cdn.sheetjs.com/xlsx-0.20.3/package/dist/xlsx.mini.min.js"></script>
   <style>
@@ -40,21 +41,21 @@
     }
     .section-tab:hover { color: var(--text, #0C1528); }
     .section-tab.active {
-      color: var(--primary, #2E86DE);
-      border-bottom-color: var(--primary, #2E86DE);
+      color: var(--primary);
+      border-bottom-color: var(--primary);
       font-weight: 600;
     }
     .section-tab-count {
-      background: var(--surface-2, #F7F9FC);
-      color: var(--text-2, #44506E);
+      background: var(--surface-2);
+      color: var(--text-2);
       border-radius: 10px;
       padding: 1px 7px;
       font-size: 12px;
       font-weight: 600;
     }
     .section-tab.active .section-tab-count {
-      background: var(--primary-bg, #EBF4FF);
-      color: var(--primary-h, #1A70C4);
+      background: var(--primary-bg);
+      color: var(--primary-h);
     }
     /* ── Cargo summary strip ─────────────────────────── */
     .cargo-summary {
@@ -424,9 +425,46 @@
     .cargo-skel .skel-2 { width: 40%; }
     .cargo-skel .skel-3 { width: 100%; height: 56px; margin-top: 14px; }
     .cargo-skel .skel-4 { width: 100%; height: 32px; margin-top: 14px; }
+
+    /* ═══ Client page specifics (section tabs pill, cargo card borders) ══════ */
+
+    /* Pill section tabs — unique to client page */
+    .client-page .section-tabs {
+      display: inline-flex;
+      background: var(--surface);
+      border-radius: 14px;
+      padding: 5px;
+      border-bottom: none;
+      box-shadow: var(--shadow);
+      margin-bottom: 24px;
+    }
+    .client-page .section-tab {
+      border-radius: 10px;
+      padding: 8px 20px;
+      border-bottom: none;
+      margin-bottom: 0;
+      font-size: 13.5px;
+      font-weight: 700;
+      color: var(--text-3);
+      letter-spacing: -.02em;
+      transition: background .15s, color .15s;
+    }
+    .client-page .section-tab:hover { color: var(--text); background: var(--surface-2); }
+    .client-page .section-tab.active { background: #0A0A0A; color: #FFFFFF; border-bottom-color: transparent; }
+    .client-page .section-tab-count { background: var(--border); color: var(--text-3); }
+    .client-page .section-tab.active .section-tab-count { background: rgba(255,255,255,.15); color: rgba(255,255,255,.7); }
+
+    /* Cargo card colored borders (Грузы tab) */
+    .client-page .cargo-card { border: none; border-left: none; }
+    .client-page .cargo-card.delivered { border-left: 4px solid var(--green); }
+    .client-page .cargo-card.transit   { border-left: 4px solid #0A0A0A; }
+    .client-page .cargo-card.warehouse { border-left: 4px solid var(--amber); }
+
+    /* Push banner jade accent */
+    .client-page #pushBanner { border-color: rgba(15,107,71,.4) !important; }
   </style>
 </head>
-<body>
+<body class="client-page">
 
   <header class="dash-header">
     <div class="dash-header-inner">
@@ -882,7 +920,7 @@
 
     banner.innerHTML = `
       <style>@keyframes slideUp{from{opacity:0;transform:translateX(-50%) translateY(16px)}to{opacity:1;transform:translateX(-50%) translateY(0)}}</style>
-      <svg width="22" height="22" fill="none" stroke="#2E86DE" stroke-width="2" viewBox="0 0 24 24" style="flex-shrink:0">
+      <svg width="22" height="22" fill="none" stroke="#0F6B47" stroke-width="2" viewBox="0 0 24 24" style="flex-shrink:0">
         <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/>
         <path d="M13.73 21a2 2 0 0 1-3.46 0"/>
       </svg>
@@ -890,7 +928,7 @@
         <div style="font-size:14px;font-weight:600;margin-bottom:2px">Включить уведомления</div>
         <div style="font-size:12px;color:rgba(255,255,255,.6)">Узнавайте о статусе грузов сразу</div>
       </div>
-      <button id="pushAllow" style="background:#2E86DE;color:#fff;border:none;border-radius:8px;padding:8px 14px;font-size:13px;font-weight:600;cursor:pointer;flex-shrink:0">Разрешить</button>
+      <button id="pushAllow" style="background:#0F6B47;color:#fff;border:none;border-radius:8px;padding:8px 14px;font-size:13px;font-weight:600;cursor:pointer;flex-shrink:0">Разрешить</button>
       <button id="pushDismiss" style="background:none;border:none;color:rgba(255,255,255,.5);cursor:pointer;padding:4px;flex-shrink:0">
         <svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24">
           <line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>
