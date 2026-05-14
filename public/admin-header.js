@@ -25,7 +25,7 @@
   const html = `<header class="dash-header">
     <div class="dash-header-inner">
       <a href="/admin.html" class="header-logo">
-        <img src="/logo-white.png" alt="FreewayChina" style="height:24px;width:auto;display:block;">
+        <img src="/logo-white.png" alt="FreewayChina" style="height:76px;width:auto;display:block;">
       </a>
       <nav class="admin-nav">${navHtml}</nav>
       <button class="btn-ghost" id="refreshBtn" title="Обновить данные">

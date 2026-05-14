@@ -462,6 +462,99 @@
 
     /* Push banner jade accent */
     .client-page #pushBanner { border-color: rgba(15,107,71,.4) !important; }
+
+    /* ── Calculator ──────────────────────────────────────── */
+    .calc-wrap { max-width: 680px; }
+    .calc-block {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-lg);
+      padding: 20px;
+      margin-bottom: 14px;
+      box-shadow: var(--shadow);
+    }
+    .calc-block-title {
+      font-size: 11px; font-weight: 700;
+      color: var(--text-3);
+      text-transform: uppercase; letter-spacing: .5px;
+      margin-bottom: 14px;
+    }
+    .calc-cats { display: flex; flex-wrap: wrap; gap: 8px; }
+    .calc-cat {
+      padding: 8px 14px;
+      border: 1.5px solid var(--border);
+      border-radius: var(--radius-sm);
+      background: var(--surface-2);
+      font-size: 13px; font-weight: 500;
+      color: var(--text-2);
+      cursor: pointer; transition: all .15s;
+    }
+    .calc-cat:hover { border-color: var(--primary-bdr); color: var(--primary); background: var(--primary-bg); }
+    .calc-cat.active { background: var(--primary); border-color: var(--primary); color: #fff; }
+
+    .calc-inputs-grid {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 12px;
+    }
+    @media (max-width: 600px) { .calc-inputs-grid { grid-template-columns: repeat(2, 1fr); } }
+    .calc-input-group label {
+      display: block;
+      font-size: 11px; font-weight: 600;
+      color: var(--text-3);
+      text-transform: uppercase; letter-spacing: .4px;
+      margin-bottom: 6px;
+    }
+    .calc-input-group input {
+      width: 100%;
+      padding: 10px 12px;
+      border: 1.5px solid var(--border);
+      border-radius: var(--radius-sm);
+      font-size: 16px; font-weight: 600;
+      font-family: 'JetBrains Mono', monospace;
+      color: var(--text); background: var(--surface-2);
+      outline: none; transition: border-color .15s, box-shadow .15s;
+    }
+    .calc-input-group input:focus {
+      border-color: var(--primary); background: var(--surface);
+      box-shadow: 0 0 0 3px rgba(15,107,71,.1);
+    }
+
+    .calc-result-card {
+      background: var(--surface);
+      border: 1.5px solid var(--border);
+      border-radius: var(--radius-lg);
+      padding: 20px;
+      box-shadow: var(--shadow);
+      margin-bottom: 14px;
+    }
+    .calc-result-row {
+      display: flex; justify-content: space-between; align-items: center;
+      padding: 8px 0;
+      font-size: 14px; color: var(--text-2);
+      border-bottom: 1px solid var(--border-light);
+    }
+    .calc-result-row:last-of-type { border-bottom: none; }
+    .calc-result-row strong { font-weight: 600; color: var(--text); font-variant-numeric: tabular-nums; }
+    .calc-total {
+      display: flex; justify-content: space-between; align-items: center;
+      padding: 14px 18px;
+      background: var(--green-bg);
+      border: 1.5px solid rgba(15,107,71,.2);
+      border-radius: var(--radius);
+      margin-top: 14px;
+    }
+    .calc-total > span:first-child { font-size: 14px; font-weight: 600; color: #087A51; }
+    .calc-total-val {
+      font-size: 28px; font-weight: 800;
+      font-family: 'JetBrains Mono', monospace;
+      color: var(--green); font-variant-numeric: tabular-nums;
+    }
+    .calc-hint {
+      text-align: center;
+      color: var(--text-3); font-size: 13px;
+      padding: 20px 0;
+    }
   </style>
 </head>
 <body class="client-page">
@@ -469,7 +562,7 @@
   <header class="dash-header">
     <div class="dash-header-inner">
       <a href="/" class="header-logo">
-        <img src="/logo-white.png" alt="FreewayChina" style="height:24px;width:auto;display:block;">
+        <img src="/logo-white.png" alt="FreewayChina" style="height:76px;width:auto;display:block;">
       </a>
       <div class="header-right">
         <div class="client-badge">
@@ -501,6 +594,15 @@
           <circle cx="5.5" cy="18.5" r="2.5"/><circle cx="18.5" cy="18.5" r="2.5"/>
         </svg>
         Грузы <span class="section-tab-count" id="stcShipments">0</span>
+      </button>
+      <button class="section-tab" data-section="calc">
+        <svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+          <rect x="4" y="2" width="16" height="20" rx="2"/><line x1="8" y1="6" x2="16" y2="6"/>
+          <line x1="8" y1="10" x2="10" y2="10"/><line x1="14" y1="10" x2="16" y2="10"/>
+          <line x1="8" y1="14" x2="10" y2="14"/><line x1="14" y1="14" x2="16" y2="14"/>
+          <line x1="8" y1="18" x2="10" y2="18"/><line x1="14" y1="18" x2="16" y2="18"/>
+        </svg>
+        Калькулятор
       </button>
     </div>
 
@@ -866,6 +968,61 @@
 
     </div><!-- /shipmentsSection -->
 
+    <!-- Section: Калькулятор стоимости -->
+    <div id="calcSection" class="hidden">
+      <div class="calc-wrap">
+
+        <div class="calc-block">
+          <div class="calc-block-title">Категория товара</div>
+          <div class="calc-cats" id="calcCats"></div>
+        </div>
+
+        <div class="calc-block">
+          <div class="calc-block-title">Параметры груза</div>
+          <div class="calc-inputs-grid">
+            <div class="calc-input-group">
+              <label>Длина, см</label>
+              <input type="number" id="cL" min="1" placeholder="60">
+            </div>
+            <div class="calc-input-group">
+              <label>Ширина, см</label>
+              <input type="number" id="cW" min="1" placeholder="40">
+            </div>
+            <div class="calc-input-group">
+              <label>Высота, см</label>
+              <input type="number" id="cH" min="1" placeholder="50">
+            </div>
+            <div class="calc-input-group">
+              <label>Вес, кг</label>
+              <input type="number" id="cKg" min="0.1" step="0.1" placeholder="12">
+            </div>
+          </div>
+        </div>
+
+        <div class="calc-result-card hidden" id="calcResult">
+          <div class="calc-result-row">
+            <span>Объём</span>
+            <strong id="rVolume">—</strong>
+          </div>
+          <div class="calc-result-row">
+            <span>Плотность</span>
+            <strong id="rDensity">—</strong>
+          </div>
+          <div class="calc-result-row">
+            <span>Тариф</span>
+            <strong id="rRate">—</strong>
+          </div>
+          <div class="calc-total">
+            <span>Итого</span>
+            <span class="calc-total-val" id="rTotal">—</span>
+          </div>
+        </div>
+
+        <p class="calc-hint" id="calcHint">Выберите категорию и введите параметры груза</p>
+
+      </div>
+    </div><!-- /calcSection -->
+
   </main>
 
   <!-- Photo modal -->
@@ -882,6 +1039,107 @@
 
   <script src="utils.js"></script>
   <script src="dashboard.js"></script>
+  <script>
+  // ─── Calculator ────────────────────────────────────────────────────────────
+  (function () {
+    const CATEGORIES = [
+      { label: 'Обувь',                idx: 0 },
+      { label: 'Одежда',               idx: 1 },
+      { label: 'Крупные товары',        idx: 2 },
+      { label: 'Игрушки',              idx: 3 },
+      { label: 'Мелкий опт',           idx: 4 },
+      { label: 'Бытовая техника',       idx: 5 },
+      { label: 'Косметика',            idx: 6 },
+      { label: 'E-commerce',           idx: 7 },
+      { label: 'Электровело / самокаты', idx: 8 },
+      { label: 'Квадро / мото',        idx: 9 },
+      { label: 'Оборудование',         idx: 10 },
+    ];
+
+    // density range [min, max) → price per kg; last row: per m³
+    const RATES = [
+      { min:800, max:Infinity, kg:[1.80,1.90,1.80,1.50,1.50,1.60,1.50,1.60,1.90,2.30,2.30] },
+      { min:600, max:800,  kg:[1.90,2.00,1.90,1.60,1.60,1.70,1.60,1.70,2.00,2.40,2.40] },
+      { min:400, max:600,  kg:[2.00,2.10,2.00,1.70,1.70,1.80,1.70,1.80,2.10,2.50,2.50] },
+      { min:300, max:400,  kg:[2.10,2.20,2.10,1.80,1.80,1.90,1.80,1.90,2.20,2.60,2.60] },
+      { min:250, max:300,  kg:[2.20,2.30,2.20,1.90,1.90,2.00,1.90,2.00,2.30,2.70,2.70] },
+      { min:200, max:250,  kg:[2.30,2.40,2.30,2.00,2.00,2.10,2.00,2.10,2.40,2.80,2.80] },
+      { min:190, max:200,  kg:[2.40,2.50,2.40,2.10,2.10,2.20,2.10,2.20,2.50,2.90,2.90] },
+      { min:180, max:190,  kg:[2.50,2.60,2.50,2.20,2.20,2.30,2.20,2.30,2.60,3.00,3.00] },
+      { min:170, max:180,  kg:[2.60,2.70,2.60,2.30,2.30,2.40,2.30,2.40,2.70,3.10,3.10] },
+      { min:160, max:170,  kg:[2.70,2.80,2.70,2.40,2.40,2.50,2.40,2.50,2.80,3.20,3.20] },
+      { min:150, max:160,  kg:[2.80,2.90,2.80,2.50,2.50,2.60,2.50,2.60,2.90,3.30,3.30] },
+      { min:140, max:150,  kg:[2.90,3.00,2.90,2.60,2.60,2.70,2.60,2.70,3.00,3.40,3.40] },
+      { min:130, max:140,  kg:[3.00,3.10,3.00,2.70,2.70,2.80,2.70,2.80,3.10,3.50,3.50] },
+      { min:120, max:130,  kg:[3.10,3.20,3.10,2.80,2.80,2.90,2.80,2.90,3.20,3.60,3.60] },
+      { min:110, max:120,  kg:[3.20,3.30,3.20,2.90,2.90,3.00,2.90,3.00,3.30,3.70,3.70] },
+      { min:100, max:110,  kg:[3.30,3.40,3.30,3.00,3.00,3.10,3.00,3.10,3.40,3.80,3.80] },
+      { min:0,   max:100,  m3:[330,340,330,300,300,310,300,310,340,380,380] },
+    ];
+
+    let catIdx = 0;
+
+    function init() {
+      const catsEl = document.getElementById('calcCats');
+      if (!catsEl) return;
+
+      catsEl.innerHTML = CATEGORIES.map((c, i) =>
+        `<button class="calc-cat${i===0?' active':''}" data-i="${i}">${c.label}</button>`
+      ).join('');
+
+      catsEl.addEventListener('click', e => {
+        const btn = e.target.closest('.calc-cat');
+        if (!btn) return;
+        catIdx = +btn.dataset.i;
+        catsEl.querySelectorAll('.calc-cat').forEach(b => b.classList.toggle('active', b === btn));
+        calc();
+      });
+
+      ['cL','cW','cH','cKg'].forEach(id =>
+        document.getElementById(id).addEventListener('input', calc));
+    }
+
+    function calc() {
+      const L  = parseFloat(document.getElementById('cL').value);
+      const W  = parseFloat(document.getElementById('cW').value);
+      const H  = parseFloat(document.getElementById('cH').value);
+      const kg = parseFloat(document.getElementById('cKg').value);
+      const res  = document.getElementById('calcResult');
+      const hint = document.getElementById('calcHint');
+
+      if (!L || !W || !H || !kg || L <= 0 || W <= 0 || H <= 0 || kg <= 0) {
+        res.classList.add('hidden'); hint.classList.remove('hidden'); return;
+      }
+
+      const vol     = (L * W * H) / 1e6;       // cm³ → m³
+      const density = kg / vol;
+      const row     = RATES.find(r => density >= r.min && density < r.max) || RATES[0];
+
+      let rateLabel, total;
+      if (row.m3) {
+        const rate = row.m3[catIdx];
+        total      = vol * rate;
+        rateLabel  = `${rate} $/м³`;
+      } else {
+        const rate = row.kg[catIdx];
+        total      = kg * rate;
+        rateLabel  = `${rate.toFixed(2)} $/кг`;
+      }
+
+      document.getElementById('rVolume').textContent  = vol.toFixed(4) + ' м³';
+      document.getElementById('rDensity').textContent = Math.round(density) + ' кг/м³';
+      document.getElementById('rRate').textContent    = rateLabel;
+      document.getElementById('rTotal').textContent   = '$​' + total.toFixed(2);
+
+      res.classList.remove('hidden');
+      hint.classList.add('hidden');
+    }
+
+    if (document.readyState === 'loading')
+      document.addEventListener('DOMContentLoaded', init);
+    else init();
+  })();
+  </script>
 
   <!-- Push notification banner + SW registration -->
   <script>

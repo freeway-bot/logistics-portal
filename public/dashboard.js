@@ -63,6 +63,7 @@ function activateSection(section) {
     b.classList.toggle('active', b.dataset.section === section));
   document.getElementById('parcelsSection').classList.toggle('hidden', section !== 'parcels');
   document.getElementById('shipmentsSection').classList.toggle('hidden', section !== 'shipments');
+  document.getElementById('calcSection').classList.toggle('hidden', section !== 'calc');
   if (section === 'shipments' && !shipmentsLoaded) loadShipments();
   writeCargoStateToHash();
 }
@@ -950,6 +951,7 @@ document.addEventListener('keydown', e => { if (e.key === 'Escape') closePhotoMo
   // Restore state from URL hash
   readCargoStateFromHash();
   if (activeSection === 'shipments') activateSection('shipments');
+  else if (activeSection === 'calc') activateSection('calc');
 
   loadData();
 })();

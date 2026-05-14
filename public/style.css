@@ -234,7 +234,7 @@ input  { font: inherit; }
   max-width: 1400px;
   margin: 0 auto;
   padding: 0 24px;
-  height: 56px;
+  height: 112px;
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -958,5 +958,5 @@ tr:hover .copy-sm { opacity: 1; }
   .tabs::-webkit-scrollbar { display: none; }
   .tab-btn { font-size: 12px; padding: 6px 12px; flex-shrink: 0; }
   .stat-value { font-size: 26px; }
-  .dash-header-inner { height: 52px; }
+  .dash-header-inner { height: 88px; }
 }
