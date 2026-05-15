@@ -36,6 +36,12 @@ function toDirectUrl(url) {
   return url;
 }
 
+function thumbUrl(url, w = 120) {
+  if (!url) return null;
+  if (url.includes('lh3.googleusercontent.com')) return `${url}=w${w}`;
+  return url;
+}
+
 // ─── Date ─────────────────────────────────────────────────────────────────────
 
 function fmtDate(str) {

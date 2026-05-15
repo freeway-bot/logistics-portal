@@ -310,6 +310,29 @@
     .ph-d-fin-total .v { font-size: 22px; font-weight: 800; color: var(--text); letter-spacing: -.4px; font-variant-numeric: tabular-nums; }
     .ph-d-comment { background: var(--surface-2); border-left: 3px solid var(--amber); padding: 12px 14px; border-radius: 0 10px 10px 0; font-size: 13px; color: var(--text-2); line-height: 1.6; margin-top: 8px; }
 
+    /* ── Photo thumbnails ────────────────────────────────────── */
+    .thumb-btn {
+      display: block; width: 52px; height: 52px;
+      border: 1.5px solid var(--border); border-radius: 8px;
+      overflow: hidden; cursor: pointer; padding: 0;
+      background: var(--surface-2);
+      transition: border-color .15s, transform .18s, box-shadow .18s;
+      flex-shrink: 0;
+    }
+    .thumb-btn:hover { border-color: rgba(0,0,0,.25); transform: scale(1.08); box-shadow: 0 4px 14px rgba(0,0,0,.12); }
+    .thumb-img { width: 100%; height: 100%; object-fit: cover; display: block; }
+
+    .thumb-card-btn {
+      display: flex; flex-direction: column; align-items: center;
+      border: 1.5px solid var(--border); border-radius: 10px;
+      overflow: hidden; cursor: pointer; padding: 0 0 6px;
+      background: var(--surface-2); gap: 0;
+      transition: border-color .15s, transform .18s, box-shadow .18s;
+    }
+    .thumb-card-btn:hover { border-color: rgba(0,0,0,.25); transform: scale(1.04); box-shadow: 0 4px 14px rgba(0,0,0,.1); }
+    .thumb-card-img { width: 88px; height: 88px; object-fit: cover; display: block; }
+    .thumb-card-lbl { font-size: 10px; color: var(--text-3); font-weight: 700; text-transform: uppercase; letter-spacing: .4px; margin-top: 6px; padding: 0 6px; }
+
     /* Empty filter state */
     .cargo-empty-filter {
       grid-column: 1 / -1;

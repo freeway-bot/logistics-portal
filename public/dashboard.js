@@ -696,12 +696,10 @@ function render() {
 
 function photoBtn(url, label) {
   if (!url) return '<span style="color:var(--text-3);font-size:12px">—</span>';
-  return `<button class="photo-icon-btn" onclick="openPhotoModal('${esc(url)}')" title="${esc(label)}">
-    <svg width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
-      <rect x="3" y="3" width="18" height="18" rx="2"/>
-      <circle cx="8.5" cy="8.5" r="1.5"/>
-      <polyline points="21 15 16 10 5 21"/>
-    </svg>
+  const thumb = thumbUrl(url, 100);
+  return `<button class="thumb-btn" onclick="openPhotoModal('${esc(url)}')" title="${esc(label)}">
+    <img class="thumb-img" src="${esc(thumb)}" loading="lazy" alt="${esc(label)}"
+         onerror="this.style.opacity=0">
   </button>`;
 }
 
@@ -771,13 +769,10 @@ function renderCards(items, total, totalPages) {
       : `<span class="card-track-num">—</span>`;
 
     const cardPhotoBtn = (url, lbl) => !url ? '' : `
-      <button class="card-photo-btn" onclick="openPhotoModal('${esc(url)}')">
-        <svg width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
-          <rect x="3" y="3" width="18" height="18" rx="2"/>
-          <circle cx="8.5" cy="8.5" r="1.5"/>
-          <polyline points="21 15 16 10 5 21"/>
-        </svg>
-        ${esc(lbl)}
+      <button class="thumb-card-btn" onclick="openPhotoModal('${esc(url)}')" title="${esc(lbl)}">
+        <img class="thumb-card-img" src="${esc(thumbUrl(url, 160))}" loading="lazy" alt="${esc(lbl)}"
+             onerror="this.style.opacity=0">
+        <span class="thumb-card-lbl">${esc(lbl)}</span>
       </button>`;
 
     const photosHtml = (photo1 || photo2) ? `
