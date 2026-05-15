@@ -13,6 +13,7 @@ let viewMode      = 'table';
 let page          = 1;
 let clientId      = '';
 let shipmentsLoaded = false;
+let _cargoDataMap   = {};
 
 // ─── DOM ──────────────────────────────────────────────────────────────────────
 
@@ -385,6 +386,10 @@ function renderCargoGroups() {
   const sorted   = getSortedShipments(filtered);
   const container = document.getElementById('cargoGroupsContainer');
 
+  // Populate lookup map for drawer
+  _cargoDataMap = {};
+  sorted.forEach(r => { if (r.cargo_number) _cargoDataMap[r.cargo_number] = r; });
+
   if (sorted.length === 0) {
     container.innerHTML = `
       <div class="cargo-empty-filter">
@@ -416,7 +421,7 @@ function renderCargoGroups() {
 
     return `<div class="month-group">
       ${head}
-      <div class="cargo-cards">${g.items.map(renderCargoCard).join('')}</div>
+      <div class="aurora-grid">${g.items.map(r => renderAuroraCard(r)).join('')}</div>
     </div>`;
   }).join('');
 }
@@ -432,128 +437,173 @@ function resetCargoFilters() {
   renderCargoGroups();
 }
 
-// ─── Single card render ──────────────────────────────────────────────────────
-function renderCargoCard(r) {
-  const cls      = cargoStatusClass(r.status);
-  const badgeMap = { delivered: 'Доставлен', transit: 'В пути', warehouse: 'На складе' };
-  const badgeLabel = r.status || badgeMap[cls] || '—';
+// ─── Aurora card render ───────────────────────────────────────────────────────
+function renderAuroraCard(r) {
+  const cls = cargoStatusClass(r.status);
+  const statusLabels = { delivered: 'Доставлен', transit: 'В пути', warehouse: 'На складе' };
+  const statusLabel = statusLabels[cls] || r.status || '—';
+  const cargoNum = r.cargo_number || '—';
+
+  let routeHtml = '';
+  if (r.route) {
+    const parts = r.route.split(/[→\-–>]+/).map(s => s.trim()).filter(Boolean);
+    const from = parts[0] || '';
+    const to   = parts[parts.length - 1] || '';
+    if (from !== to) {
+      routeHtml = `<div class="a-route"><span>${esc(from)}</span><div class="a-route-line"></div><span>${esc(to)}</span></div>`;
+    }
+  }
+
+  return `
+  <div class="a-card ${cls}" onclick="openCargoDrawer('${esc(cargoNum)}')">
+    <div class="a-head">
+      <div class="a-num-block">
+        <div class="a-num">${esc(cargoNum)}</div>
+        <div class="a-cat">${esc(r.category || '—')}</div>
+      </div>
+      <div class="a-pill ${cls}"><span class="apulse"></span>${esc(statusLabel)}</div>
+    </div>
+    ${routeHtml}
+    <div class="a-metrics">
+      <div class="a-metric">
+        <div class="a-metric-val">${esc(String(r.places || '—'))}</div>
+        <div class="a-metric-label">Мест</div>
+      </div>
+      <div class="a-metric">
+        <div class="a-metric-val">${esc(fmtRuNum(r.weight, 1))}<span class="a-unit">кг</span></div>
+        <div class="a-metric-label">Вес</div>
+      </div>
+      <div class="a-metric">
+        <div class="a-metric-val">${esc(fmtRuNum(r.volume, 3))}<span class="a-unit">м³</span></div>
+        <div class="a-metric-label">Объём</div>
+      </div>
+    </div>
+    <div class="a-foot">
+      <span>${esc(fmtDate(r.date))}</span>
+      <strong>${esc(fmtMoney(r.total))}</strong>
+    </div>
+  </div>`;
+}
+
+// ─── Premium Hero Drawer ──────────────────────────────────────────────────────
+function openCargoDrawer(cargoNum) {
+  const r = _cargoDataMap[cargoNum];
+  if (!r) return;
+
+  const cls = cargoStatusClass(r.status);
+  const statusLabels = { delivered: 'Доставлен', transit: 'В пути', warehouse: 'На складе' };
+  const statusLabel = statusLabels[cls] || r.status || '—';
+
+  const progDots = (() => {
+    if (cls === 'delivered') return ['done','done','done','done'];
+    if (cls === 'transit')   return ['done','done','current',''];
+    if (cls === 'warehouse') return ['done','current','',''];
+    return ['current','','',''];
+  })();
+
+  const route = [r.route, r.carrier].filter(Boolean).join(' · ');
+
+  document.getElementById('phHero').innerHTML = `
+    <div class="ph-d-top">
+      <div class="ph-d-brand">FreewayChina</div>
+      <div class="ph-d-actions">
+        <div class="ph-d-status-pill">
+          <span class="pp-dot ${cls}"></span>${esc(statusLabel)}
+        </div>
+        <button class="ph-d-close" onclick="closeCargoDrawer()">
+          <svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24">
+            <line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>
+          </svg>
+        </button>
+      </div>
+    </div>
+    <div class="ph-d-num">${esc(r.cargo_number || '—')}${r.client_id ? ` · Клиент ${esc(r.client_id)}` : ''}</div>
+    <div class="ph-d-cat">${esc(r.category || '—')}</div>
+    <div class="ph-d-amount-label">К оплате</div>
+    <div class="ph-d-amount">${esc(fmtMoney(r.total))}</div>
+    ${route ? `<div class="ph-d-amount-sub">${esc(route)}</div>` : ''}
+    <div class="ph-d-progress">
+      ${progDots.map(d => `<div class="ph-d-pdot ${d}"></div>`).join('')}
+    </div>
+    <div class="ph-d-stages">
+      <span>Отправлен</span><span>Склад</span><span>В пути</span><span>Доставлен</span>
+    </div>`;
 
   const insLabel = (() => {
     const pct = ruNum(r.insurance_pct);
-    return !isNaN(pct) && pct > 0 ? `Страховка ${pct}%` : 'Страховка';
+    return !isNaN(pct) && pct > 0 ? `Страховка (${pct}%)` : 'Страховка';
   })();
-
-  const costRows = [
+  const finRows = [
     ['Стоимость груза', r.cargo_cost],
     [insLabel,          r.insurance_usd],
     ['Упаковка',        r.packaging],
     ['Погрузка',        r.loading],
   ].filter(([, v]) => ruNum(v) > 0);
 
-  // Efficiency: price/kg + density
-  const pkg = ruNum(r.price_per_kg);
-  const dens = ruNum(r.density);
-  const effItems = [];
-  if (!isNaN(pkg) && pkg > 0)  effItems.push(`<span class="cc-eff-item"><strong>${fmtMoney(pkg)}</strong> / кг</span>`);
-  if (!isNaN(dens) && dens > 0) effItems.push(`<span class="cc-eff-item"><strong>${fmtRuNum(dens, 0)}</strong> кг/м³</span>`);
-  const efficiencyRow = effItems.length
-    ? `<div class="cc-efficiency">${effItems.join('<span class="cc-eff-sep">·</span>')}</div>`
-    : '';
+  const infoRows = [
+    ['Дата отправки',  fmtDate(r.date)],
+    ['Ожид. прибытие', fmtDate(r.arrival)],
+    ['ID клиента',     r.client_id],
+    ['Маршрут',        r.route],
+    ['Перевозчик',     r.carrier],
+    ['Цена за кг',     fmtMoney(r.price_per_kg)],
+  ].filter(([, v]) => v && v !== '—');
 
-  // Status timeline (3 steps: загружен → в пути → прибыл)
-  const tl = (() => {
-    if (cls === 'delivered') return ['done','done','done'];
-    if (cls === 'transit')   return ['done','active',''];
-    if (cls === 'warehouse') return ['warehouse-active','',''];
-    return ['','',''];
-  })();
+  let commentHtml = '';
+  if (r.comment) {
+    let comments = [];
+    try { comments = JSON.parse(r.comment); } catch {}
+    if (!Array.isArray(comments)) comments = [{ ts: null, text: r.comment }];
+    const latest = comments[comments.length - 1];
+    if (latest && latest.text) {
+      commentHtml = `<div class="ph-d-comment">${esc(latest.text)}</div>`;
+    }
+  }
 
-  // Smart arrival
-  const arr = smartArrivalLabel(r);
-  const arrivalRow = arr ? `
-    <div class="cc-arrival ${arr.kind}">
-      <svg width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
-        ${arr.kind === 'delivered'
-          ? '<polyline points="20 6 9 17 4 12"/>'
-          : '<rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/>'}
-      </svg>
-      <strong>${esc(arr.label)}</strong>
-      <span style="margin-left:auto;opacity:.7">${esc(arr.date)}</span>
-    </div>` : '';
+  document.getElementById('phBody').innerHTML = `
+    <div class="ph-d-stats">
+      <div class="ph-d-stat">
+        <div class="ph-d-stat-val">${esc(r.places || '—')}</div>
+        <div class="ph-d-stat-label">Мест</div>
+      </div>
+      <div class="ph-d-stat">
+        <div class="ph-d-stat-val">${esc(fmtRuNum(r.weight, 1))}<span class="unit">кг</span></div>
+        <div class="ph-d-stat-label">Вес</div>
+      </div>
+      <div class="ph-d-stat">
+        <div class="ph-d-stat-val">${esc(fmtRuNum(r.volume, 3))}<span class="unit">м³</span></div>
+        <div class="ph-d-stat-label">Объём</div>
+      </div>
+    </div>
+    ${infoRows.length ? `
+    <div class="ph-d-section">
+      <div class="ph-d-section-title">Информация</div>
+      ${infoRows.map(([k, v]) => `<div class="ph-d-row"><span class="k">${esc(k)}</span><span class="v">${esc(v)}</span></div>`).join('')}
+    </div>` : ''}
+    ${finRows.length ? `
+    <div class="ph-d-section">
+      <div class="ph-d-section-title">Финансы</div>
+      ${finRows.map(([k, v]) => `<div class="ph-d-row"><span class="k">${esc(k)}</span><span class="v">${esc(fmtMoney(v))}</span></div>`).join('')}
+      <div class="ph-d-fin-total">
+        <span class="k">К оплате</span>
+        <span class="v">${esc(fmtMoney(r.total))}</span>
+      </div>
+    </div>` : ''}
+    ${commentHtml}`;
 
-  const cargoNum = r.cargo_number || '—';
-  const detailUrl = `/cargo-detail.html?id=${encodeURIComponent(cargoNum)}`;
-
-  return `
-  <a class="cargo-card ${cls}" href="${esc(detailUrl)}" data-cargo="${esc(cargoNum)}">
-    <div class="cc-head">
-      <div class="cc-number-wrap">
-        <span class="cc-number" title="${esc(cargoNum)}">${esc(cargoNum)}</span>
-        <button class="cc-copy" onclick="copyCargoNum(event, this, '${esc(cargoNum)}')" title="Скопировать">
-          <svg width="11" height="11" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
-            <rect x="9" y="9" width="13" height="13" rx="2"/>
-            <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/>
-          </svg>
-        </button>
-      </div>
-      <div class="cc-badge ${cls}">${esc(badgeLabel)}</div>
-    </div>
-    <div class="cc-meta">
-      <span>${esc(fmtDate(r.date))}</span>
-      ${r.category ? `<span class="cc-meta-dot">·</span><span class="cc-cat-tag">${esc(r.category)}</span>` : ''}
-    </div>
-    <div class="cc-timeline">
-      <div class="cc-tl-step ${tl[0]}"></div>
-      <div class="cc-tl-step ${tl[1]}"></div>
-      <div class="cc-tl-step ${tl[2]}"></div>
-    </div>
-    <div class="cc-tl-labels">
-      <span>Загружен</span><span>В пути</span><span>Прибыл</span>
-    </div>
-    <div class="cc-metrics">
-      <div class="cc-metric">
-        <span class="cc-m-val">${esc(r.places || '—')}</span>
-        <span class="cc-m-lbl">мест</span>
-      </div>
-      <div class="cc-metric">
-        <span class="cc-m-val">${esc(fmtRuNum(r.weight, 1))}</span>
-        <span class="cc-m-lbl">кг</span>
-      </div>
-      <div class="cc-metric">
-        <span class="cc-m-val">${esc(fmtRuNum(r.volume, 3))}</span>
-        <span class="cc-m-lbl">м³</span>
-      </div>
-    </div>
-    ${efficiencyRow}
-    <div class="cc-cost">
-      ${costRows.map(([lbl, val]) => `
-        <div class="cc-cost-row dim">
-          <span>${esc(lbl)}</span>
-          <span>${esc(fmtMoney(val))}</span>
-        </div>`).join('')}
-      ${costRows.length ? '<div class="cc-cost-divider"></div>' : ''}
-      <div class="cc-cost-total">
-        <span class="cc-cost-total-lbl">Итого</span>
-        <span class="cc-cost-total-val">${esc(fmtMoney(r.total))}</span>
-      </div>
-    </div>
-    ${arrivalRow}
-  </a>`;
+  document.getElementById('phBackdrop').classList.add('open');
+  document.getElementById('phDrawer').classList.add('open');
+  document.body.style.overflow = 'hidden';
 }
 
-// Copy cargo number (preserve event so card link doesn't trigger)
-function copyCargoNum(e, btn, val) {
-  e.preventDefault();
-  e.stopPropagation();
-  navigator.clipboard.writeText(val).then(() => {
-    btn.classList.add('copied');
-    btn.innerHTML = '<svg width="11" height="11" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12"/></svg>';
-    setTimeout(() => {
-      btn.classList.remove('copied');
-      btn.innerHTML = '<svg width="11" height="11" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>';
-    }, 1500);
-  });
+function closeCargoDrawer() {
+  document.getElementById('phBackdrop').classList.remove('open');
+  document.getElementById('phDrawer').classList.remove('open');
+  document.body.style.overflow = '';
 }
+
+window.openCargoDrawer  = openCargoDrawer;
+window.closeCargoDrawer = closeCargoDrawer;
 
 // ─── Export CSV ──────────────────────────────────────────────────────────────
 function exportCargoCSV() {
@@ -920,7 +970,7 @@ el.exportXLSXBtn.addEventListener('click', () => {
 // Modal
 el.modalClose.addEventListener('click', () => closePhotoModal());
 el.modal.addEventListener('click', e => { if (e.target === el.modal) closePhotoModal(); });
-document.addEventListener('keydown', e => { if (e.key === 'Escape') closePhotoModal(); });
+document.addEventListener('keydown', e => { if (e.key === 'Escape') { closeCargoDrawer(); closePhotoModal(); } });
 
 // ─── Init ─────────────────────────────────────────────────────────────────────
 
