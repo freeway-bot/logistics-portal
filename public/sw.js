@@ -1,5 +1,5 @@
 // Service Worker — FreewayChina PWA
-const CACHE = 'fw-v1';
+const CACHE = 'fw-v3';
 
 // Minimal offline cache for the client pages
 self.addEventListener('install', e => {

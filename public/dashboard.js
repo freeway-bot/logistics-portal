@@ -849,8 +849,9 @@ function render() {
 
 function photoBtn(url, label) {
   if (!url) return '<span style="color:var(--text-3);font-size:12px">—</span>';
-  const thumb = thumbUrl(url, 100);
-  return `<button class="thumb-btn" onclick="openPhotoModal('${esc(url)}')" title="${esc(label)}">
+  const thumb  = thumbUrl(url, 80);
+  const medium = thumbUrl(url, 1200);
+  return `<button class="thumb-btn" onclick="openPhotoModal('${esc(medium)}')" title="${esc(label)}">
     <img class="thumb-img" src="${esc(thumb)}" loading="lazy" alt="${esc(label)}"
          onerror="this.style.opacity=0">
   </button>`;
@@ -922,7 +923,7 @@ function renderCards(items, total, totalPages) {
       : `<span class="card-track-num">—</span>`;
 
     const cardPhotoBtn = (url, lbl) => !url ? '' : `
-      <button class="thumb-card-btn" onclick="openPhotoModal('${esc(url)}')" title="${esc(lbl)}">
+      <button class="thumb-card-btn" onclick="openPhotoModal('${esc(thumbUrl(url, 1200))}')" title="${esc(lbl)}">
         <img class="thumb-card-img" src="${esc(thumbUrl(url, 160))}" loading="lazy" alt="${esc(lbl)}"
              onerror="this.style.opacity=0">
         <span class="thumb-card-lbl">${esc(lbl)}</span>
