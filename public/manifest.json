@@ -2,7 +2,7 @@
   "name": "FreewayChina",
   "short_name": "FreewayChina",
   "description": "Личный кабинет клиента FreewayChina",
-  "start_url": "/client.html",
+  "start_url": "/dashboard.html",
   "scope": "/",
   "display": "standalone",
   "background_color": "#0A0A0A",

@@ -65,7 +65,12 @@ function activateSection(section) {
   document.getElementById('parcelsSection').classList.toggle('hidden', section !== 'parcels');
   document.getElementById('shipmentsSection').classList.toggle('hidden', section !== 'shipments');
   document.getElementById('calcSection').classList.toggle('hidden', section !== 'calc');
+  document.getElementById('statsSection').classList.toggle('hidden', section !== 'stats');
   if (section === 'shipments' && !shipmentsLoaded) loadShipments();
+  if (section === 'stats') {
+    if (!shipmentsLoaded) loadShipments();
+    else renderStats();
+  }
   writeCargoStateToHash();
 }
 
@@ -164,6 +169,7 @@ async function loadShipments() {
     if (stc) stc.textContent = allShipments.length;
 
     renderShipments();
+    if (activeSection === 'stats') renderStats();
   } catch (err) {
     document.getElementById('shipErrorMsg').textContent = err.message;
     shipState('error');
@@ -405,6 +411,153 @@ function renderCargoGroups() {
   }
 
   container.innerHTML = `<div class="aurora-grid">${sorted.map(r => renderAuroraCard(r)).join('')}</div>`;
+}
+
+// ─── Statistics ───────────────────────────────────────────────────────────────
+function renderStats() {
+  const container = document.getElementById('statsContent');
+  if (!container) return;
+
+  const totalParcelCount = allItems.length;
+  const totalCargoCount  = allShipments.length;
+  const totalSpend       = allShipments.reduce((s, r) => s + (ruNum(r.total)  || 0), 0);
+  const totalWeight      = allShipments.reduce((s, r) => s + (ruNum(r.weight) || 0), 0);
+
+  if (!totalParcelCount && !totalCargoCount) {
+    container.innerHTML = `<div class="stat-empty">Данных пока нет — они появятся после первой отгрузки</div>`;
+    return;
+  }
+
+  // Monthly spend — last 6 months
+  const now = new Date();
+  const months = [];
+  for (let i = 5; i >= 0; i--) {
+    const d   = new Date(now.getFullYear(), now.getMonth() - i, 1);
+    const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
+    const lbl = d.toLocaleDateString('ru-RU', { month: 'short' }).replace('.', '');
+    months.push({ key, lbl, val: 0 });
+  }
+  allShipments.forEach(r => {
+    const d = parseRuDate(r.date);
+    if (!d) return;
+    const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
+    const m   = months.find(x => x.key === key);
+    if (m) m.val += ruNum(r.total) || 0;
+  });
+  const maxVal = Math.max(...months.map(m => m.val), 1);
+
+  // Category breakdown (parcels)
+  const catMap = new Map();
+  allItems.forEach(item => {
+    const cat = item.category || 'Другое';
+    catMap.set(cat, (catMap.get(cat) || 0) + 1);
+  });
+  const cats   = [...catMap.entries()].sort((a, b) => b[1] - a[1]).slice(0, 7);
+  const maxCat = cats[0]?.[1] || 1;
+
+  // Cargo status breakdown
+  let cTransit = 0, cWarehouse = 0, cDelivered = 0;
+  allShipments.forEach(r => {
+    const cls = cargoStatusClass(r.status);
+    if (cls === 'transit')   cTransit++;
+    else if (cls === 'delivered') cDelivered++;
+    else cWarehouse++;
+  });
+
+  const barsHtml = months.map(m => {
+    const h = m.val > 0 ? Math.max(Math.round(m.val / maxVal * 100), 3) : 0;
+    return `<div class="stat-bar-col"><div class="stat-bar-fill" style="height:${h}%"></div></div>`;
+  }).join('');
+
+  const valsHtml = months.map(m =>
+    `<div class="stat-bar-val-top">${m.val > 0 ? '$' + Math.round(m.val) : ''}</div>`
+  ).join('');
+
+  const lblsHtml = months.map(m => `<div class="stat-bar-lbl">${m.lbl}</div>`).join('');
+
+  const catsHtml = cats.map(([cat, cnt]) => `
+    <div class="stat-cat-row">
+      <span class="stat-cat-name" title="${esc(cat)}">${esc(cat)}</span>
+      <div class="stat-cat-bar-wrap">
+        <div class="stat-cat-bar" style="width:${Math.round(cnt / maxCat * 100)}%"></div>
+      </div>
+      <span class="stat-cat-count">${cnt}</span>
+    </div>`).join('');
+
+  container.innerHTML = `
+    <div class="cargo-summary" style="margin-bottom:20px">
+      <div class="csum-card">
+        <div class="csum-icon blue">
+          <svg width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+            <path d="M20 7H4a2 2 0 0 0-2 2v6a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V9a2 2 0 0 0-2-2Z"/>
+            <path d="M16 7V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v2"/>
+          </svg>
+        </div>
+        <div><div class="csum-val">${totalParcelCount}</div><div class="csum-label">Посылок</div></div>
+      </div>
+      <div class="csum-card">
+        <div class="csum-icon purple">
+          <svg width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+            <path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/>
+            <polyline points="3.27 6.96 12 12.01 20.73 6.96"/><line x1="12" y1="22.08" x2="12" y2="12"/>
+          </svg>
+        </div>
+        <div><div class="csum-val">${totalCargoCount}</div><div class="csum-label">Грузов</div></div>
+      </div>
+      <div class="csum-card">
+        <div class="csum-icon green">
+          <svg width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+            <line x1="12" y1="1" x2="12" y2="23"/>
+            <path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/>
+          </svg>
+        </div>
+        <div><div class="csum-val">${fmtMoney(totalSpend)}</div><div class="csum-label">Потрачено</div></div>
+      </div>
+      <div class="csum-card">
+        <div class="csum-icon amber">
+          <svg width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+            <path d="M6.5 6.5h11l1.5 13.5a1 1 0 0 1-1 1.1H6a1 1 0 0 1-1-1.1L6.5 6.5Z"/>
+            <path d="M9 6.5V5a3 3 0 0 1 6 0v1.5"/><line x1="3" y1="11" x2="21" y2="11"/>
+          </svg>
+        </div>
+        <div><div class="csum-val">${fmtRuNum(totalWeight, 1)} кг</div><div class="csum-label">Общий вес</div></div>
+      </div>
+    </div>
+
+    ${totalCargoCount ? `
+    <div class="stat-chart-card">
+      <div class="stat-chart-title">Расходы по месяцам</div>
+      <div class="stat-val-row">${valsHtml}</div>
+      <div class="stat-bars">${barsHtml}</div>
+      <div class="stat-lbl-row">${lblsHtml}</div>
+    </div>` : ''}
+
+    <div class="stat-two-col">
+      ${cats.length ? `
+      <div class="stat-chart-card">
+        <div class="stat-chart-title">Категории посылок</div>
+        ${catsHtml}
+      </div>` : ''}
+
+      ${totalCargoCount ? `
+      <div class="stat-chart-card">
+        <div class="stat-chart-title">Статус грузов</div>
+        <div class="stat-status-grid">
+          <div class="stat-status-item s-transit">
+            <div class="stat-status-num">${cTransit}</div>
+            <div class="stat-status-lbl">В пути</div>
+          </div>
+          <div class="stat-status-item s-warehouse">
+            <div class="stat-status-num">${cWarehouse}</div>
+            <div class="stat-status-lbl">На складе</div>
+          </div>
+          <div class="stat-status-item s-delivered">
+            <div class="stat-status-num">${cDelivered}</div>
+            <div class="stat-status-lbl">Доставлено</div>
+          </div>
+        </div>
+      </div>` : ''}
+    </div>`;
 }
 
 function resetCargoFilters() {
@@ -947,6 +1100,35 @@ el.exportXLSXBtn.addEventListener('click', () => {
 el.modalClose.addEventListener('click', () => closePhotoModal());
 el.modal.addEventListener('click', e => { if (e.target === el.modal) closePhotoModal(); });
 document.addEventListener('keydown', e => { if (e.key === 'Escape') { closeCargoDrawer(); closePhotoModal(); } });
+
+// ─── Service Worker + PWA install prompt ──────────────────────────────────────
+
+if ('serviceWorker' in navigator) {
+  window.addEventListener('load', () => navigator.serviceWorker.register('/sw.js').catch(() => {}));
+}
+
+let _deferredInstall = null;
+
+window.addEventListener('beforeinstallprompt', e => {
+  e.preventDefault();
+  _deferredInstall = e;
+  if (!sessionStorage.getItem('pwa-dismissed')) {
+    setTimeout(() => document.getElementById('pwaBanner')?.classList.remove('hidden'), 4000);
+  }
+});
+
+document.getElementById('pwaInstall')?.addEventListener('click', async () => {
+  if (!_deferredInstall) return;
+  _deferredInstall.prompt();
+  await _deferredInstall.userChoice;
+  _deferredInstall = null;
+  document.getElementById('pwaBanner')?.classList.add('hidden');
+});
+
+document.getElementById('pwaDismiss')?.addEventListener('click', () => {
+  sessionStorage.setItem('pwa-dismissed', '1');
+  document.getElementById('pwaBanner')?.classList.add('hidden');
+});
 
 // ─── Init ─────────────────────────────────────────────────────────────────────
 

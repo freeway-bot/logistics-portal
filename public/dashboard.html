@@ -499,6 +499,147 @@
       color: var(--text-3); font-size: 13px;
       padding: 20px 0;
     }
+
+    /* ── Statistics section ──────────────────────────────── */
+    .stat-chart-card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-lg);
+      padding: 18px 20px;
+      margin-bottom: 16px;
+      box-shadow: var(--shadow);
+    }
+    .stat-chart-title {
+      font-size: 11px; font-weight: 700;
+      color: var(--text-3);
+      text-transform: uppercase; letter-spacing: .5px;
+      margin-bottom: 14px;
+    }
+    .stat-val-row, .stat-lbl-row { display: flex; gap: 3px; }
+    .stat-bar-val-top {
+      flex: 1; text-align: center;
+      font-size: 8px; color: var(--text-3); font-weight: 600;
+      font-variant-numeric: tabular-nums;
+      min-width: 0; white-space: nowrap; overflow: hidden;
+    }
+    .stat-bars {
+      display: flex; gap: 3px;
+      height: 80px; margin: 3px 0 5px;
+      border-bottom: 1px solid var(--border);
+    }
+    .stat-bar-col {
+      flex: 1;
+      display: flex; flex-direction: column; justify-content: flex-end;
+    }
+    .stat-bar-fill {
+      width: 100%;
+      background: linear-gradient(to top, #0F6B47, rgba(34,197,94,.25));
+      border-radius: 3px 3px 0 0;
+    }
+    .stat-bar-lbl {
+      flex: 1; text-align: center;
+      font-size: 8.5px; color: var(--text-3); font-weight: 500;
+    }
+    .stat-cat-row {
+      display: flex; align-items: center; gap: 10px; margin-bottom: 8px;
+    }
+    .stat-cat-name {
+      width: 110px; flex-shrink: 0;
+      font-size: 12px; color: var(--text-2); font-weight: 500;
+      white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+    }
+    .stat-cat-bar-wrap {
+      flex: 1; height: 6px;
+      background: var(--surface-2); border-radius: 3px; overflow: hidden;
+    }
+    .stat-cat-bar {
+      height: 100%;
+      background: linear-gradient(to right, #0F6B47, rgba(34,197,94,.5));
+      border-radius: 3px;
+    }
+    .stat-cat-count {
+      width: 28px; text-align: right;
+      font-size: 12px; color: var(--text-3); font-weight: 600;
+      font-variant-numeric: tabular-nums;
+    }
+    .stat-two-col { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+    @media (max-width: 700px) { .stat-two-col { grid-template-columns: 1fr; } }
+    .stat-two-col .stat-chart-card { margin-bottom: 0; }
+    .stat-status-grid { display: grid; grid-template-columns: repeat(3,1fr); gap: 10px; }
+    .stat-status-item {
+      text-align: center; padding: 14px 8px;
+      border-radius: 10px; background: var(--surface-2);
+    }
+    .stat-status-num {
+      font-size: 26px; font-weight: 800; color: var(--text);
+      letter-spacing: -.5px; font-variant-numeric: tabular-nums;
+    }
+    .stat-status-lbl {
+      font-size: 10px; font-weight: 700; color: var(--text-3);
+      text-transform: uppercase; letter-spacing: .4px; margin-top: 3px;
+    }
+    .stat-status-item.s-transit   .stat-status-num { color: #0A0A0A; }
+    .stat-status-item.s-warehouse .stat-status-num { color: #A86100; }
+    .stat-status-item.s-delivered .stat-status-num { color: #087A51; }
+    .stat-empty {
+      text-align: center; padding: 48px 20px;
+      color: var(--text-3); font-size: 14px;
+    }
+
+    /* ── PWA install banner ──────────────────────────────── */
+    .pwa-banner {
+      position: fixed; bottom: 92px; right: 20px; z-index: 499;
+      max-width: 320px;
+      background: var(--surface); border: 1px solid var(--border);
+      border-radius: 18px; padding: 14px 16px;
+      box-shadow: 0 8px 32px rgba(0,0,0,.14);
+      display: flex; align-items: center; gap: 12px;
+      animation: slideUp .4s cubic-bezier(.4,0,.2,1);
+    }
+    @keyframes slideUp {
+      from { transform: translateY(20px); opacity: 0; }
+      to   { transform: translateY(0);    opacity: 1; }
+    }
+    .pwa-banner.hidden { display: none; }
+    .pwa-banner-icon img { width: 42px; height: 42px; border-radius: 10px; }
+    .pwa-banner-text { flex: 1; min-width: 0; }
+    .pwa-banner-text strong { display: block; font-size: 13px; font-weight: 700; color: var(--text); }
+    .pwa-banner-text span { font-size: 11px; color: var(--text-3); }
+    .pwa-banner-btns { display: flex; flex-direction: column; gap: 5px; flex-shrink: 0; }
+    .pwa-banner-btns button {
+      padding: 5px 12px; border-radius: 8px;
+      font-size: 12px; font-weight: 600; cursor: pointer;
+      border: none; transition: all .15s; white-space: nowrap;
+    }
+    #pwaDismiss { background: var(--surface-2); color: var(--text-3); border: 1px solid var(--border) !important; }
+    #pwaDismiss:hover { color: var(--text); }
+    #pwaInstall { background: #0A0A0A; color: #fff; }
+    #pwaInstall:hover { background: #333; }
+
+    /* ── Telegram FAB ────────────────────────────────────── */
+    .tg-fab {
+      position: fixed; bottom: 26px; right: 26px; z-index: 500;
+      display: flex; align-items: center; text-decoration: none;
+    }
+    .tg-fab-btn {
+      width: 54px; height: 54px;
+      background: #2AABEE; border-radius: 50%;
+      display: flex; align-items: center; justify-content: center;
+      box-shadow: 0 4px 20px rgba(42,171,238,.45);
+      transition: transform .2s, box-shadow .2s; flex-shrink: 0;
+    }
+    .tg-fab:hover .tg-fab-btn {
+      transform: scale(1.08) translateY(-2px);
+      box-shadow: 0 8px 28px rgba(42,171,238,.55);
+    }
+    .tg-fab-label {
+      background: #1a1a2e; color: #fff;
+      padding: 6px 12px; border-radius: 8px;
+      font-size: 12px; font-weight: 600; white-space: nowrap;
+      margin-right: 10px;
+      opacity: 0; transition: opacity .2s; pointer-events: none;
+    }
+    .tg-fab:hover .tg-fab-label { opacity: 1; }
   </style>
 </head>
 <body class="client-page">
@@ -547,6 +688,14 @@
           <line x1="8" y1="18" x2="10" y2="18"/><line x1="14" y1="18" x2="16" y2="18"/>
         </svg>
         Калькулятор
+      </button>
+      <button class="section-tab" data-section="stats">
+        <svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+          <line x1="18" y1="20" x2="18" y2="10"/>
+          <line x1="12" y1="20" x2="12" y2="4"/>
+          <line x1="6" y1="20" x2="6" y2="14"/>
+        </svg>
+        Статистика
       </button>
     </div>
 
@@ -947,7 +1096,40 @@
       </div>
     </div><!-- /calcSection -->
 
+    <!-- Section: Статистика -->
+    <div id="statsSection" class="hidden">
+      <div id="statsContent">
+        <div class="state-center">
+          <div class="spinner"></div>
+          <p class="state-desc">Подготавливаем аналитику…</p>
+        </div>
+      </div>
+    </div><!-- /statsSection -->
+
+    <!-- PWA install banner -->
+    <div id="pwaBanner" class="pwa-banner hidden">
+      <div class="pwa-banner-icon"><img src="/icon-192.png" alt="FreewayChina"></div>
+      <div class="pwa-banner-text">
+        <strong>Установить приложение</strong>
+        <span>Быстрый доступ с главного экрана</span>
+      </div>
+      <div class="pwa-banner-btns">
+        <button id="pwaDismiss">Позже</button>
+        <button id="pwaInstall">Установить</button>
+      </div>
+    </div>
+
   </main>
+
+  <!-- Telegram FAB — замените ссылку на Telegram вашего менеджера -->
+  <a class="tg-fab" href="https://t.me/freewaychina" target="_blank" rel="noopener" title="Написать менеджеру">
+    <span class="tg-fab-label">Написать менеджеру</span>
+    <span class="tg-fab-btn">
+      <svg width="26" height="26" viewBox="0 0 24 24" fill="white">
+        <path d="M12 0C5.37 0 0 5.37 0 12s5.37 12 12 12 12-5.37 12-12S18.63 0 12 0zm5.95 8.18-2.04 9.6c-.15.66-.54.82-1.08.51l-3-2.21-1.45 1.39c-.16.16-.3.3-.61.3l.21-3.07 5.56-5.02c.24-.21-.05-.33-.37-.12L7.09 13.7l-2.96-.93c-.64-.2-.65-.64.14-.95l11.57-4.46c.53-.19.99.13.81.82z"/>
+      </svg>
+    </span>
+  </a>
 
   <!-- Cargo Detail Drawer (Premium Hero) -->
   <div class="ph-backdrop" id="phBackdrop" onclick="closeCargoDrawer()"></div>
