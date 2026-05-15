@@ -404,26 +404,7 @@ function renderCargoGroups() {
     return;
   }
 
-  const groups = groupByMonth(sorted);
-  const showHeaders = groups.length > 1;
-
-  container.innerHTML = groups.map(g => {
-    const sum = monthSummary(g.items);
-    const head = showHeaders ? `
-      <div class="month-head">
-        <div class="month-title">${esc(monthTitle(g))}</div>
-        <div class="month-stats">
-          <strong>${g.items.length}</strong> ${pluralRu(g.items.length,'груз','груза','грузов')}
-          · <strong>${fmtRuNum(sum.w, 1)}</strong> кг
-          · <strong>${fmtMoney(sum.t)}</strong>
-        </div>
-      </div>` : '';
-
-    return `<div class="month-group">
-      ${head}
-      <div class="aurora-grid">${g.items.map(r => renderAuroraCard(r)).join('')}</div>
-    </div>`;
-  }).join('');
+  container.innerHTML = `<div class="aurora-grid">${sorted.map(r => renderAuroraCard(r)).join('')}</div>`;
 }
 
 function resetCargoFilters() {
