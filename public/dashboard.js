@@ -675,7 +675,6 @@ function openCargoDrawer(cargoNum) {
 
   const infoRows = [
     ['Дата отправки',  fmtDate(r.date)],
-    ['Ожид. прибытие', fmtDate(r.arrival)],
     ['ID клиента',     r.client_id],
   ].filter(([, v]) => v && v !== '—');
 
