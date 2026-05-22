@@ -17,8 +17,15 @@ app.set('trust proxy', 1);
 const PORT = process.env.PORT || 3000;
 const CACHE_TTL  = (parseInt(process.env.CACHE_TTL_SECONDS) || 60) * 1000;
 const USE_MOCK   = process.env.USE_MOCK_DATA === 'true';
-const JWT_SECRET = process.env.JWT_SECRET || 'dev-secret-change-in-prod';
+const JWT_SECRET = process.env.JWT_SECRET;
 const IS_PROD    = process.env.NODE_ENV === 'production';
+
+// Без секретного ключа токены входа можно подделать — не запускаемся.
+if (!JWT_SECRET || JWT_SECRET === 'dev-secret-change-in-prod') {
+  console.error('❌  FATAL: переменная окружения JWT_SECRET не задана.');
+  console.error('   Задайте JWT_SECRET в Railway → Variables (или в .env локально) и перезапустите сервер.');
+  process.exit(1);
+}
 
 const SCANS_SPREADSHEET_ID     = process.env.SCANS_SPREADSHEET_ID     || process.env.SPREADSHEET_ID;
 const LOGISTICS_SPREADSHEET_ID = process.env.LOGISTICS_SPREADSHEET_ID || process.env.SPREADSHEET_ID;
