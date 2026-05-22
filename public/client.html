@@ -222,16 +222,6 @@
       <!-- Body -->
       <div class="client-card-body">
 
-        <!-- Tabs -->
-        <div class="client-tabs">
-          <button class="client-tab active" data-tab="login">
-            Личный кабинет
-          </button>
-          <button class="client-tab" data-tab="track">
-            Поиск по треку
-          </button>
-        </div>
-
         <!-- Login form -->
         <div id="loginPanel">
           <form id="loginForm" autocomplete="off">
@@ -261,21 +251,6 @@
           <p class="client-hint">Войдите для просмотра всех ваших грузов</p>
         </div>
 
-        <!-- Track search form -->
-        <div id="trackPanel" style="display:none">
-          <form id="trackForm" autocomplete="off">
-            <div>
-              <label class="client-form-label">Трек-номер</label>
-              <input class="client-input" id="trackInput"
-                type="text" placeholder="Введите трек-номер"
-                autocorrect="off" autocapitalize="none" spellcheck="false"/>
-            </div>
-            <div class="client-error" id="trackError"></div>
-            <button type="submit" class="client-btn" id="trackBtn">Найти груз</button>
-          </form>
-          <p class="client-hint">Поиск по трек-номеру без входа в систему</p>
-        </div>
-
       </div><!-- /body -->
 
       <div class="client-footer">
@@ -286,25 +261,8 @@
   </div>
 
   <script>
-    // ── Tab toggle
-    document.querySelectorAll('.client-tab').forEach(btn => {
-      btn.addEventListener('click', () => {
-        document.querySelectorAll('.client-tab').forEach(b => b.classList.remove('active'));
-        btn.classList.add('active');
-        const tab = btn.dataset.tab;
-        document.getElementById('loginPanel').style.display = tab === 'login' ? '' : 'none';
-        document.getElementById('trackPanel').style.display = tab === 'track' ? '' : 'none';
-        clearErrors();
-        if (tab === 'login') document.getElementById('loginInput').focus();
-        else document.getElementById('trackInput').focus();
-      });
-    });
-
     window.addEventListener('DOMContentLoaded', () => {
       document.getElementById('loginInput').focus();
-      if (new URLSearchParams(location.search).get('tab') === 'track') {
-        document.querySelector('[data-tab="track"]').click();
-      }
     });
 
     // ── Password toggle
@@ -356,36 +314,8 @@
       hideErr(document.getElementById('loginError'));
     });
 
-    // ── Track form
-    document.getElementById('trackForm').addEventListener('submit', async e => {
-      e.preventDefault();
-      const track = document.getElementById('trackInput').value.trim();
-      const errEl = document.getElementById('trackError');
-      const btn   = document.getElementById('trackBtn');
-      if (!track)           return showErr(errEl, 'Введите трек-номер');
-      if (track.length < 3) return showErr(errEl, 'Минимум 3 символа');
-
-      btn.disabled = true; btn.textContent = 'Ищем…';
-      hideErr(errEl);
-
-      try {
-        const res  = await fetch(`/api/search?track=${encodeURIComponent(track)}`);
-        const data = await res.json();
-        if (!res.ok || data.total === 0) return showErr(errEl, data.error || 'Ничего не найдено');
-        window.location.href = `/search.html?track=${encodeURIComponent(track)}`;
-      } catch {
-        showErr(errEl, 'Нет соединения с сервером');
-      } finally {
-        btn.disabled = false; btn.textContent = 'Найти груз';
-      }
-    });
-
     function showErr(el, msg) { el.textContent = msg; el.style.display = 'block'; }
     function hideErr(el)      { el.style.display = 'none'; }
-    function clearErrors()    {
-      hideErr(document.getElementById('loginError'));
-      hideErr(document.getElementById('trackError'));
-    }
   </script>
 </body>
 </html>

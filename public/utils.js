@@ -1,4 +1,4 @@
-// utils.js — shared helpers used by dashboard.js, search.js
+// utils.js — shared helpers used by dashboard.js
 // Include this file BEFORE the page-specific script
 
 // ─── Status ───────────────────────────────────────────────────────────────────

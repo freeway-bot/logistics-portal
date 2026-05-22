@@ -761,20 +761,6 @@ app.get('/api/client/:clientId', requireAuth, async (req, res) => {
   } catch (err) { console.error('[/client/:id]', err.message); res.status(500).json({ error: 'Ошибка сервера' }); }
 });
 
-// GET /api/search?track=XXX — still accessible, but auth recommended
-app.get('/api/search', async (req, res) => {
-  try {
-    const track = (req.query.track || '').trim();
-    if (!track) return res.status(400).json({ error: 'Укажите трек' });
-    if (track.length < 3) return res.status(400).json({ error: 'Минимум 3 символа' });
-
-    const { data: allData } = await getAllData();
-    const q = track.toLowerCase();
-    const results = allData.filter(r => (r.track_number||'').toLowerCase().includes(q)).slice(0, 500);
-    res.json({ query: track, total: results.length, data: results });
-  } catch (err) { res.status(500).json({ error: 'Ошибка поиска' }); }
-});
-
 // ── Admin analytics routes (employee + admin) ─────────────────────────────────
 
 // GET /api/admin/stats

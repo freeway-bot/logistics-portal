@@ -1,30 +1,4 @@
-// login.js — unified login for all roles + track search
-
-// ─── Mode toggle ──────────────────────────────────────────────────────────────
-
-const modeBtns   = document.querySelectorAll('.mode-btn');
-const loginPanel = document.getElementById('loginPanel');
-const trackPanel = document.getElementById('trackPanel');
-
-modeBtns.forEach(btn => {
-  btn.addEventListener('click', () => {
-    modeBtns.forEach(b => b.classList.remove('active'));
-    btn.classList.add('active');
-    const mode = btn.dataset.mode;
-    loginPanel.classList.toggle('hidden', mode !== 'login');
-    trackPanel.classList.toggle('hidden',  mode !== 'track');
-    clearErrors();
-    if (mode === 'login') document.getElementById('loginInput').focus();
-    else document.getElementById('trackInput').focus();
-  });
-});
-
-window.addEventListener('DOMContentLoaded', () => {
-  document.getElementById('loginInput').focus();
-  if (new URLSearchParams(location.search).get('mode') === 'track') {
-    document.querySelector('[data-mode="track"]').click();
-  }
-});
+// login.js — unified login for all roles
 
 // ─── Password toggle ──────────────────────────────────────────────────────────
 
@@ -45,6 +19,8 @@ const loginInput = document.getElementById('loginInput');
 const loginError = document.getElementById('loginError');
 const loginBtn   = document.getElementById('loginBtn');
 
+window.addEventListener('DOMContentLoaded', () => loginInput.focus());
+
 loginForm.addEventListener('submit', async e => {
   e.preventDefault();
   const login    = loginInput.value.trim();
@@ -54,7 +30,7 @@ loginForm.addEventListener('submit', async e => {
   if (!password) return showErr(loginError, 'Введите пароль');
 
   setLoading(loginBtn, true, 'Проверяем…');
-  clearErrors();
+  loginError.classList.add('hidden');
 
   try {
     const res  = await fetch('/api/auth/login', {
@@ -66,10 +42,8 @@ loginForm.addEventListener('submit', async e => {
 
     if (!res.ok) return showErr(loginError, data.error || 'Ошибка входа');
 
-    const { role, clientId } = data.user;
-    if (role === 'client') {
-      window.location.href = `/dashboard.html`;
-    } else if (role === 'employee') {
+    const { role } = data.user;
+    if (role === 'employee') {
       window.location.href = '/shipments.html';
     } else if (role === 'admin') {
       window.location.href = '/admin.html';
@@ -85,39 +59,7 @@ loginForm.addEventListener('submit', async e => {
 
 loginInput.addEventListener('input', () => loginError.classList.add('hidden'));
 
-// ─── Track search form ────────────────────────────────────────────────────────
-
-const trackForm  = document.getElementById('trackForm');
-const trackInput = document.getElementById('trackInput');
-const trackError = document.getElementById('trackError');
-const trackBtn   = document.getElementById('trackBtn');
-
-trackForm.addEventListener('submit', async e => {
-  e.preventDefault();
-  const track = trackInput.value.trim();
-  if (!track)           return showErr(trackError, 'Введите трек-номер');
-  if (track.length < 3) return showErr(trackError, 'Минимум 3 символа для поиска');
-
-  setLoading(trackBtn, true, 'Ищем…');
-  clearErrors();
-
-  try {
-    const res  = await fetch(`/api/search?track=${encodeURIComponent(track)}`);
-    const data = await res.json();
-    if (!res.ok)       return showErr(trackError, data.error || 'Ошибка поиска');
-    if (data.total === 0) return showErr(trackError, 'Ничего не найдено по этому треку');
-    window.location.href = `/search.html?track=${encodeURIComponent(track)}`;
-  } catch {
-    showErr(trackError, 'Нет соединения с сервером');
-  } finally {
-    setLoading(trackBtn, false, 'Найти груз');
-  }
-});
-
-trackInput.addEventListener('input', () => trackError.classList.add('hidden'));
-
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
 function showErr(el, msg) { el.textContent = msg; el.classList.remove('hidden'); }
-function clearErrors() { [loginError, trackError].forEach(e => e.classList.add('hidden')); }
 function setLoading(btn, on, label) { btn.disabled = on; btn.textContent = label; }
