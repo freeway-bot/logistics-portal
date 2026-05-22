@@ -718,8 +718,7 @@ function openCargoDrawer(cargoNum) {
         <span class="k">К оплате</span>
         <span class="v">${esc(fmtMoney(r.total))}</span>
       </div>
-    </div>` : ''}
-    ${commentHtml}`;
+    </div>` : ''}`;
 
   document.getElementById('phBackdrop').classList.add('open');
   document.getElementById('phDrawer').classList.add('open');
