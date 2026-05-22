@@ -635,7 +635,7 @@ function openCargoDrawer(cargoNum) {
     return ['current','','',''];
   })();
 
-  const route = [r.route].filter(Boolean).join(' · ');
+  const route = '';
 
   document.getElementById('phHero').innerHTML = `
     <div class="ph-d-top">
@@ -668,7 +668,6 @@ function openCargoDrawer(cargoNum) {
     return !isNaN(pct) && pct > 0 ? `Страховка (${pct}%)` : 'Страховка';
   })();
   const finRows = [
-    ['Стоимость груза', r.cargo_cost],
     [insLabel,          r.insurance_usd],
     ['Упаковка',        r.packaging],
     ['Погрузка',        r.loading],
@@ -678,8 +677,6 @@ function openCargoDrawer(cargoNum) {
     ['Дата отправки',  fmtDate(r.date)],
     ['Ожид. прибытие', fmtDate(r.arrival)],
     ['ID клиента',     r.client_id],
-    ['Маршрут',        r.route],
-    ['Цена за кг',     fmtMoney(r.price_per_kg)],
   ].filter(([, v]) => v && v !== '—');
 
   let commentHtml = '';
