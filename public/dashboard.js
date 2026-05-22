@@ -739,11 +739,11 @@ function exportCargoCSV() {
   const items = getSortedShipments(getFilteredShipments());
   if (!items.length) return;
 
-  const headers = ['Номер груза','Дата','Категория','Статус','Мест','Вес (кг)','Объём (м³)','Цена/кг','Плотность','Стоимость груза','Страховка %','Страховка $','Упаковка','Погрузка','Итого','Прибытие'];
+  const headers = ['Номер груза','Дата','Категория','Статус','Мест','Вес (кг)','Объём (м³)','Цена/кг','Страховка %','Страховка $','Упаковка','Погрузка','Итого','Прибытие'];
   const rows = items.map(r => [
     r.cargo_number, r.date, r.category, r.status,
-    r.places, r.weight, r.volume, r.price_per_kg, r.density,
-    r.cargo_cost, r.insurance_pct, r.insurance_usd, r.packaging, r.loading, r.total, r.arrival
+    r.places, r.weight, r.volume, r.price_per_kg,
+    r.insurance_pct, r.insurance_usd, r.packaging, r.loading, r.total, r.arrival
   ].map(v => {
     const s = (v == null ? '' : String(v)).replace(/"/g, '""');
     return /[,;"\n]/.test(s) ? `"${s}"` : s;

@@ -701,10 +701,18 @@ app.get('/api/client/shipments', requireRole('client', 'admin', 'employee'), asy
 
     if (!clientId) return res.status(400).json({ code: 'client.missing_id', error: 'Укажите client_id' });
 
+    // Клиент не должен видеть внутренние поля: себестоимость, перевозчик, комментарии
+    const isClient = req.user.role === 'client';
+    const stripInternal = (row) => {
+      if (!isClient) return row;
+      const { cargo_cost, carrier, comment, ...safe } = row;
+      return safe;
+    };
+
     if (USE_MOCK) {
       const prefix = clientId.toLowerCase() + '-';
       const data   = MOCK_CARGO.filter(r => (r.cargo_number || '').toLowerCase().startsWith(prefix));
-      return res.json({ clientId, total: data.length, data });
+      return res.json({ clientId, total: data.length, data: data.map(stripInternal) });
     }
 
     const { data: allData } = await getAllCargo();
@@ -719,7 +727,7 @@ app.get('/api/client/shipments', requireRole('client', 'admin', 'employee'), asy
       return num ? num.split('-')[0].trim().toLowerCase() === clientLow : false;
     });
 
-    res.json({ clientId, total: data.length, data: data.map(normalizeCargoRow) });
+    res.json({ clientId, total: data.length, data: data.map(r => stripInternal(normalizeCargoRow(r))) });
   } catch (err) {
     console.error('[/client/shipments]', err.message);
     res.status(500).json({ error: 'Ошибка сервера' });
