@@ -9,3 +9,6 @@ credentials-list.txt
 
 # Local Netlify folder
 .netlify
+
+# Claude Code working dir (worktrees, local state)
+.claude/
