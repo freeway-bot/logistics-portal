@@ -676,6 +676,7 @@ function openCargoDrawer(cargoNum) {
   const infoRows = [
     ['Дата отправки',  fmtDate(r.date)],
     ['ID клиента',     r.client_id],
+    ['Тариф',          fmtMoney(r.price_per_kg)],
   ].filter(([, v]) => v && v !== '—');
 
   let commentHtml = '';
