@@ -635,7 +635,7 @@ function openCargoDrawer(cargoNum) {
     return ['current','','',''];
   })();
 
-  const route = [r.route, r.carrier].filter(Boolean).join(' · ');
+  const route = [r.route].filter(Boolean).join(' · ');
 
   document.getElementById('phHero').innerHTML = `
     <div class="ph-d-top">
@@ -679,7 +679,6 @@ function openCargoDrawer(cargoNum) {
     ['Ожид. прибытие', fmtDate(r.arrival)],
     ['ID клиента',     r.client_id],
     ['Маршрут',        r.route],
-    ['Перевозчик',     r.carrier],
     ['Цена за кг',     fmtMoney(r.price_per_kg)],
   ].filter(([, v]) => v && v !== '—');
 
