@@ -1,5 +1,29 @@
 // shipments.js — список отгрузок из «送货 Логистика»
 
+function parseDate(s) {
+  if (!s) return null;
+  const m = s.toString().trim().match(/^(\d{1,2})[.,/](\d{1,2})[.,/](\d{4})$/);
+  if (m) return new Date(+m[3], +m[2] - 1, +m[1]);
+  const d = new Date(s);
+  return isNaN(d) ? null : d;
+}
+
+function transitDaysCell(shipped, arrival, status) {
+  const s = parseDate(shipped);
+  if (!s) return '<span style="color:var(--text-3)">—</span>';
+  const sl = (status || '').toLowerCase();
+  const isDelivered = /доставл|delivered|получен/.test(sl);
+  const arrived = parseDate(arrival);
+  const end = isDelivered ? (arrived || null) : new Date();
+  if (!end) return isDelivered ? '<span style="font-size:12px;color:#5b21b6;font-weight:600">Доставлено</span>' : '<span style="color:var(--text-3)">—</span>';
+  const days = Math.round((end - s) / 86400000);
+  if (days < 0) return '<span style="color:var(--text-3)">—</span>';
+  if (isDelivered) {
+    return `<span style="font-size:12px;color:#5b21b6;font-weight:600">${days} дн.</span>`;
+  }
+  return `<span style="font-size:12px;color:#065f46;font-weight:600">${days} дн.</span>`;
+}
+
 let allData      = [];   // полный список с сервера
 let filtered     = [];   // после фильтра + поиска
 let sortCol      = 'shipped_at';
@@ -102,7 +126,7 @@ function sortFiltered() {
     }
 
     // Даты
-    if (sortCol === 'shipped_at' || sortCol === 'arrival') {
+    if (sortCol === 'shipped_at') {
       const da = parseRuDate(va), db = parseRuDate(vb);
       if (da && db) return sortDir === 'asc' ? da - db : db - da;
       if (da) return sortDir === 'asc' ? -1 : 1;
@@ -169,7 +193,6 @@ function renderPage() {
     tbody.innerHTML = slice.map(s => {
       const id   = s.shipment_id || '—';
       const date = s.shipped_at  || '—';
-      const arr  = s.arrival     || '—';
 
       const metrics = [
         metricChip('📦', s.total_places, 'мест'),
@@ -186,7 +209,7 @@ function renderPage() {
         <td><div class="metrics">${metrics}</div></td>
         <td style="font-weight:700;color:var(--text)">${s.total ? '$' + esc(s.total) : '<span style="color:var(--text-3)">—</span>'}</td>
         <td>${statusBadge(s.status)}</td>
-        <td style="white-space:nowrap;font-size:12px;color:${arr === '—' ? 'var(--text-3)' : 'var(--text-2)'}">${esc(arr)}</td>
+        <td style="text-align:center">${transitDaysCell(s.shipped_at, s.arrival, s.status)}</td>
       </tr>`;
     }).join('');
   }
@@ -243,7 +266,7 @@ document.querySelectorAll('th.sortable').forEach(th => {
       sortDir = sortDir === 'asc' ? 'desc' : 'asc';
     } else {
       sortCol = col;
-      sortDir = col === 'shipped_at' || col === 'arrival' ? 'desc' : 'asc';
+      sortDir = col === 'shipped_at' ? 'desc' : 'asc';
     }
     sortFiltered();
     renderPage();

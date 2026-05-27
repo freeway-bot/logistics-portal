@@ -249,6 +249,25 @@ function pluralRu(n, one, few, many) {
   return many;
 }
 
+function transitDaysInfo(r) {
+  const shipped = parseRuDate(r.date);
+  if (!shipped) return null;
+  const cls     = cargoStatusClass(r.status);
+  const arrived = parseRuDate(r.arrival);
+  if (cls === 'delivered') {
+    if (arrived) {
+      const days = Math.round((arrived - shipped) / 86400000);
+      if (days >= 0) return { kind: 'delivered', text: `Доставлено за ${days} ${pluralRu(days, 'день', 'дня', 'дней')}` };
+    }
+    return { kind: 'delivered', text: 'Доставлено' };
+  }
+  if (cls !== 'transit' && cls !== 'shipped') return null;
+  const today = new Date(); today.setHours(0,0,0,0);
+  const days = Math.round((today - shipped) / 86400000);
+  if (days >= 0) return { kind: 'transit', text: `${days} ${pluralRu(days, 'день', 'дня', 'дней')} в пути` };
+  return null;
+}
+
 function smartArrivalLabel(r) {
   const cls     = cargoStatusClass(r.status);
   const arrival = parseRuDate(r.arrival);
@@ -577,16 +596,7 @@ function renderAuroraCard(r) {
   const statusLabels = { delivered: 'Доставлен', transit: 'В пути', warehouse: 'На складе' };
   const statusLabel = statusLabels[cls] || r.status || '—';
   const cargoNum = r.cargo_number || '—';
-
-  let routeHtml = '';
-  if (r.route) {
-    const parts = r.route.split(/[→\-–>]+/).map(s => s.trim()).filter(Boolean);
-    const from = parts[0] || '';
-    const to   = parts[parts.length - 1] || '';
-    if (from !== to) {
-      routeHtml = `<div class="a-route"><span>${esc(from)}</span><div class="a-route-line"></div><span>${esc(to)}</span></div>`;
-    }
-  }
+  const di = transitDaysInfo(r);
 
   return `
   <div class="a-card ${cls}" onclick="openCargoDrawer('${esc(cargoNum)}')">
@@ -597,7 +607,6 @@ function renderAuroraCard(r) {
       </div>
       <div class="a-pill ${cls}"><span class="apulse"></span>${esc(statusLabel)}</div>
     </div>
-    ${routeHtml}
     <div class="a-metrics">
       <div class="a-metric">
         <div class="a-metric-val">${esc(String(r.places || '—'))}</div>
@@ -614,6 +623,7 @@ function renderAuroraCard(r) {
     </div>
     <div class="a-foot">
       <span>${esc(fmtDate(r.date))}</span>
+      ${di ? `<span class="a-days-chip ${di.kind}">${esc(di.text)}</span>` : ''}
       <strong>${esc(fmtMoney(r.total))}</strong>
     </div>
   </div>`;
@@ -673,11 +683,21 @@ function openCargoDrawer(cargoNum) {
     ['Погрузка',        r.loading],
   ].filter(([, v]) => ruNum(v) > 0);
 
+  const di2 = transitDaysInfo(r);
+  const daysRow = (() => {
+    if (!di2) return null;
+    if (di2.kind === 'delivered') {
+      const suffix = r.arrival ? ` · ${fmtDate(r.arrival)}` : '';
+      return ['Доставлено за', di2.text.replace('Доставлено за ', '') + suffix];
+    }
+    return ['Дней в пути', di2.text];
+  })();
   const infoRows = [
-    ['Дата отправки',  fmtDate(r.date)],
-    ['ID клиента',     r.client_id],
-    ['Тариф',          fmtMoney(r.price_per_kg)],
-  ].filter(([, v]) => v && v !== '—');
+    ['Дата отправки', fmtDate(r.date)],
+    daysRow,
+    ['ID клиента',    r.client_id],
+    ['Тариф',         fmtMoney(r.price_per_kg)],
+  ].filter(row => row && row[1] && row[1] !== '—');
 
   let commentHtml = '';
   if (r.comment) {
@@ -846,7 +866,7 @@ function photoBtn(url, label) {
   if (!url) return '<span style="color:var(--text-3);font-size:12px">—</span>';
   const thumb  = thumbUrl(url, 80);
   const medium = thumbUrl(url, 1200);
-  return `<button class="thumb-btn" onclick="openPhotoModal('${esc(medium)}')" title="${esc(label)}">
+  return `<button class="thumb-btn" onclick="openPhotoModal('${esc(medium)}','${esc(url)}')" title="${esc(label)}">
     <img class="thumb-img" src="${esc(thumb)}" loading="lazy" alt="${esc(label)}"
          onerror="this.style.opacity=0">
   </button>`;
@@ -918,7 +938,7 @@ function renderCards(items, total, totalPages) {
       : `<span class="card-track-num">—</span>`;
 
     const cardPhotoBtn = (url, lbl) => !url ? '' : `
-      <button class="thumb-card-btn" onclick="openPhotoModal('${esc(thumbUrl(url, 1200))}')" title="${esc(lbl)}">
+      <button class="thumb-card-btn" onclick="openPhotoModal('${esc(thumbUrl(url, 1200))}','${esc(url)}')" title="${esc(lbl)}">
         <img class="thumb-card-img" src="${esc(thumbUrl(url, 160))}" loading="lazy" alt="${esc(lbl)}"
              onerror="this.style.opacity=0">
         <span class="thumb-card-lbl">${esc(lbl)}</span>

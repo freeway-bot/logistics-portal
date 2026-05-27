@@ -66,6 +66,7 @@ function render({ shipment, tracks }) {
     ? `Клиент: ${shipment.client_id}` : '';
 
   updateStatusPill(shipment.status);
+  updateTransitChip(shipment.shipped_at, shipment.arrival);
 
   // Fill fields
   document.getElementById('f-shipment_id').value = shipment.shipment_id || '';
@@ -93,6 +94,32 @@ function render({ shipment, tracks }) {
 }
 
 // ─── Status pill ──────────────────────────────────────────────────────────────
+
+function parseDetailDate(s) {
+  if (!s) return null;
+  const m = s.toString().trim().match(/^(\d{1,2})[.,/](\d{1,2})[.,/](\d{4})$/);
+  if (m) return new Date(+m[3], +m[2] - 1, +m[1]);
+  const d = new Date(s);
+  return isNaN(d) ? null : d;
+}
+
+function updateTransitChip(shipped, arrival) {
+  const chip = document.getElementById('transitChip');
+  const s = parseDetailDate(shipped);
+  if (!s) { chip.style.display = 'none'; return; }
+  const arrived = parseDetailDate(arrival);
+  const end = arrived || new Date();
+  const days = Math.round((end - s) / 86400000);
+  if (days < 0) { chip.style.display = 'none'; return; }
+  chip.style.display = 'inline-block';
+  if (arrived) {
+    chip.textContent = `Доставлено за ${days} дн.`;
+    chip.className = 'transit-chip chip-delivered';
+  } else {
+    chip.textContent = `${days} дн. в пути`;
+    chip.className = 'transit-chip chip-transit';
+  }
+}
 
 function statusPillClass(s) {
   const v = (s || '').toLowerCase();
@@ -241,8 +268,13 @@ function onFieldChange(el) {
   const changed = el.value !== (originalValues[field] || '');
   el.classList.toggle('changed', changed);
 
-  // Обновляем статус-пилюлю при смене статуса
+  // Обновляем статус-пилюлю и чип дней при смене полей
   if (field === 'status') updateStatusPill(el.value);
+  if (field === 'shipped_at' || field === 'arrival') {
+    const shipped = document.getElementById('f-shipped_at')?.value;
+    const arrival = document.getElementById('f-arrival')?.value;
+    updateTransitChip(shipped, arrival);
+  }
 
   // Проверяем, есть ли хоть одно изменённое поле
   const anyChanged = FIELDS.some(f => {

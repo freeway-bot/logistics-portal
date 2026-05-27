@@ -90,11 +90,21 @@ function fallbackCopy(text, cb) {
 
 // ─── Modal ────────────────────────────────────────────────────────────────────
 
-function openPhotoModal(url, modalId = 'photoModal', imgId = 'modalImg') {
+function openPhotoModal(mediumUrl, origUrl, modalId = 'photoModal', imgId = 'modalImg') {
+  // Backward compat: if origUrl is a DOM id string (old 2-arg call), shift args
+  if (typeof origUrl === 'string' && (origUrl === 'photoModal' || document.getElementById(origUrl))) {
+    modalId = origUrl; origUrl = mediumUrl;
+  }
   const modal = document.getElementById(modalId);
   const img   = document.getElementById(imgId);
   if (!modal || !img) return;
-  img.src = url;
+  img.src = mediumUrl;
+  const dlBtn = modal.querySelector('.modal-download');
+  if (dlBtn) {
+    const orig = origUrl || mediumUrl;
+    dlBtn.href = orig;
+    dlBtn.download = 'photo_original';
+  }
   modal.classList.remove('hidden');
   document.body.style.overflow = 'hidden';
 }

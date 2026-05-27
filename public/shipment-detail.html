@@ -1,6 +1,7 @@
 <!DOCTYPE html>
 <html lang="ru">
 <head>
+  <link rel="icon" type="image/png" href="/freewaychina-09.png">
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Груз</title>
@@ -177,9 +178,19 @@
       font-weight: 700;
     }
     .s-shipped   { background: #d1fae5; color: #065f46; }
-    .s-transit   { background: #fef3c7; color: #92400e; }
-    .s-delivered { background: #dbeafe; color: #1e40af; }
+    .s-transit   { background: #d1fae5; color: #065f46; }
+    .s-delivered { background: #ede9fe; color: #5b21b6; }
     .s-other     { background: var(--surface-2); color: var(--text-3); }
+    .transit-chip {
+      display: inline-block;
+      padding: 3px 10px;
+      border-radius: 20px;
+      font-size: 11px;
+      font-weight: 700;
+      white-space: nowrap;
+    }
+    .transit-chip.chip-transit   { background: #d1fae5; color: #065f46; }
+    .transit-chip.chip-delivered { background: #ede9fe; color: #5b21b6; }
 
     /* ── Computed total row ── */
     .computed-row {
@@ -334,6 +345,7 @@
           <div class="save-bar-client" id="barClient"></div>
         </div>
         <span id="statusPill" class="status-pill s-other" style="white-space:nowrap">—</span>
+        <span id="transitChip" class="transit-chip" style="display:none"></span>
         <span class="unsaved-dot" id="unsavedDot" title="Есть несохранённые изменения"></span>
         <button class="btn-save" id="saveBtn">
           <svg width="13" height="13" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24">

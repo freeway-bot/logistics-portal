@@ -1,6 +1,7 @@
 <!DOCTYPE html>
 <html lang="ru">
 <head>
+  <link rel="icon" type="image/png" href="/freewaychina-09.png">
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Отгрузки</title>
@@ -88,8 +89,8 @@
       white-space: nowrap;
     }
     .badge-shipped   { background: #d1fae5; color: #065f46; }
-    .badge-transit   { background: #fef3c7; color: #92400e; }
-    .badge-delivered { background: #dbeafe; color: #1e40af; }
+    .badge-transit   { background: #d1fae5; color: #065f46; }
+    .badge-delivered { background: #ede9fe; color: #5b21b6; }
     .badge-empty     { background: var(--surface-2); color: var(--text-3); }
 
     /* ── Cargo number cell ── */
@@ -214,7 +215,7 @@
               <th>Места / Вес / Объём</th>
               <th class="sortable" data-col="total">Итого, $ <span class="sort-icon" id="si-total">↕</span></th>
               <th>Статус</th>
-              <th class="sortable" data-col="arrival">Прибытие <span class="sort-icon" id="si-arrival">↕</span></th>
+              <th>Дней</th>
             </tr>
           </thead>
           <tbody id="shipBody"></tbody>

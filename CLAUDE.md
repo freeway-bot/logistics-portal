@@ -117,12 +117,16 @@ invalidateCargoCache() // сбросить кеш грузов
 
 ## Деплой
 
+> **Важно**: автодеплоя нет ни у одного сервиса. Push в `main` сам по себе
+> ничего не выкатывает — деплой всегда ручной, отдельно для бэка и фронта.
+
 **Railway** (backend + server.js):
-- `railway up` или push в `main` → автодеплой
+- Деплой вручную через Railway GraphQL API (`serviceInstanceDeployV2` с `commitSha`).
+- serviceId / environmentId / токен — в memory `infrastructure.md`.
 - Env vars задаются в Railway Dashboard → Variables
 
 **Netlify** (frontend static из `public/`):
-- `netlify deploy --prod` или push в `main`
+- Деплой вручную: `netlify deploy --prod --dir=public`
 - `scripts/gen-redirects.js` генерирует `public/_redirects` при билде
 - Все запросы к `/api/*` должны проксироваться на Railway URL через `_redirects`
 
