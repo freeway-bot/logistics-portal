@@ -41,15 +41,22 @@ fileInput.addEventListener('change', () => {
 
 // ─── Submit ───────────────────────────────────────────────────────────────────
 
+const linkOnlyCheck = document.getElementById('linkOnly');
+
+linkOnlyCheck.addEventListener('change', () => {
+  submitBtn.textContent = linkOnlyCheck.checked ? 'Привязать к грузу' : 'Создать отгрузку';
+});
+
 submitBtn.addEventListener('click', async () => {
-  const tracks = parseTracks(trackInput.value);
+  const tracks   = parseTracks(trackInput.value);
   if (tracks.length === 0) { toast('Введите трек-номера', 'error'); return; }
 
-  const cargo  = cargoNumber.value.trim();
-  const client = clientId.value.trim();
+  const cargo    = cargoNumber.value.trim();
+  const client   = clientId.value.trim();
+  const linkOnly = linkOnlyCheck.checked;
 
   submitBtn.disabled    = true;
-  submitBtn.textContent = 'Создаём отгрузку…';
+  submitBtn.textContent = linkOnly ? 'Привязываем…' : 'Создаём отгрузку…';
   document.getElementById('resultPlaceholder').classList.add('hidden');
   document.getElementById('resultLoading').classList.remove('hidden');
   document.getElementById('resultBox').classList.add('hidden');
@@ -58,7 +65,7 @@ submitBtn.addEventListener('click', async () => {
     const res = await fetch('/api/admin/shipments', {
       method:  'POST',
       headers: { 'Content-Type': 'application/json' },
-      body:    JSON.stringify({ tracks, cargo_number: cargo, client_id: client }),
+      body:    JSON.stringify({ tracks, cargo_number: cargo, client_id: client, link_only: linkOnly }),
     });
     const data = await res.json();
     if (!res.ok) throw new Error(data.error || 'Ошибка сервера');
@@ -70,7 +77,7 @@ submitBtn.addEventListener('click', async () => {
     document.getElementById('resultPlaceholder').classList.remove('hidden');
   } finally {
     submitBtn.disabled    = false;
-    submitBtn.textContent = 'Создать отгрузку';
+    submitBtn.textContent = linkOnly ? 'Привязать к грузу' : 'Создать отгрузку';
   }
 });
 
@@ -84,15 +91,23 @@ function renderResult(data) {
   const stats   = document.getElementById('resultStats');
   const details = document.getElementById('resultDetails');
 
-  title.textContent = `Отгрузка ${data.cargo_number} — ${data.updated} треков`;
+  const isLinkOnly = !!data.link_only;
+  title.textContent = isLinkOnly
+    ? `Привязка к грузу ${data.cargo_number} — ${data.updated} треков`
+    : `Отгрузка ${data.cargo_number} — ${data.updated} треков`;
 
-  stats.innerHTML = [
-    { label: 'Номер груза',          value: data.cargo_number,         cls: 'neu', big: false },
-    { label: 'Привязано треков',     value: data.updated,              cls: data.updated > 0 ? 'ok' : 'warn' },
-    { label: 'Не найдено',           value: data.notFound.length,      cls: data.notFound.length > 0 ? 'err' : 'ok' },
-    { label: 'Дублей в списке',      value: data.duplicates.length,    cls: data.duplicates.length > 0 ? 'warn' : 'ok' },
-    { label: 'Уже отправлены',       value: data.alreadyShipped.length,cls: 'neu' },
-  ].map(s => `
+  const statRows = [
+    { label: 'Номер груза',      value: data.cargo_number,          cls: 'neu' },
+    { label: isLinkOnly ? 'Привязано треков' : 'Отправлено треков',
+                                 value: data.updated,               cls: data.updated > 0 ? 'ok' : 'warn' },
+    { label: 'Не найдено',       value: data.notFound.length,       cls: data.notFound.length > 0 ? 'err' : 'ok' },
+    { label: 'Дублей в списке',  value: data.duplicates.length,     cls: data.duplicates.length > 0 ? 'warn' : 'ok' },
+  ];
+  if (!isLinkOnly) {
+    statRows.push({ label: 'Уже отправлены', value: data.alreadyShipped.length, cls: 'neu' });
+  }
+
+  stats.innerHTML = statRows.map(s => `
     <div class="result-stat ${s.cls}">
       <div class="result-stat-label">${esc(s.label)}</div>
       <div class="result-stat-value" style="font-size:${s.label === 'Номер груза' ? '14px' : '22px'};word-break:break-all">${esc(String(s.value))}</div>
@@ -121,7 +136,7 @@ function renderResult(data) {
     html += `<div class="result-list-title">Дубли в списке (${data.duplicates.length})</div>
              <div class="result-list">${data.duplicates.map(t => esc(t)).join('<br>')}</div>`;
   }
-  if (data.alreadyShipped.length > 0) {
+  if (!isLinkOnly && data.alreadyShipped.length > 0) {
     html += `<div class="result-list-title">Уже были отправлены ранее (${data.alreadyShipped.length})</div>
              <div class="result-list">${data.alreadyShipped.map(t => esc(t)).join('<br>')}</div>`;
   }
@@ -133,5 +148,9 @@ function renderResult(data) {
   details.innerHTML = html;
   box.classList.remove('hidden');
 
-  if (data.updated > 0) toast(`Груз ${data.cargo_number} создан — привязано ${data.updated} треков`);
+  if (data.updated > 0) {
+    toast(isLinkOnly
+      ? `${data.updated} треков привязано к грузу ${data.cargo_number}`
+      : `Груз ${data.cargo_number} создан — отправлено ${data.updated} треков`);
+  }
 }

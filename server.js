@@ -419,7 +419,7 @@ const CARGO_COLS = {
   date:0, client_id:1, category:3, cargo_number:4, places:5,
   weight:6, volume:7, price_per_kg:8, density:9, cargo_cost:10,
   insurance_pct:11, insurance_usd:12, packaging:13, loading:14,
-  total:15, status:16, arrival:17, route:20, carrier:21, comment:23,
+  total:15, status:16, arrival:18, route:20, carrier:21, comment:23,
 };
 
 function getCol(r, idx) {
@@ -675,7 +675,7 @@ app.get('/api/client/parcels', requireRole('client', 'admin', 'employee'), async
         const cargoArrived = new Set();
         (cargoRes.data || []).forEach(r => {
           const norm = normalizeCargoRow(r);
-          if (norm.cargo_number && norm.arrival) cargoArrived.add(norm.cargo_number.toLowerCase());
+          if (norm.cargo_number && parseItemDate(norm.arrival)) cargoArrived.add(norm.cargo_number.toLowerCase());
         });
         data = data.map(p => {
           const track = (p.track_number || '').toLowerCase();
@@ -1012,10 +1012,11 @@ app.post('/api/admin/shipments', requireRole('admin', 'employee'), async (req, r
   try {
     if (USE_MOCK) return res.json({ cargo_number: req.body?.cargo_number || 'MOCK', updated: 0, notFound: [], duplicates: [], alreadyShipped: [] });
 
-    const { tracks: rawTracks = [], cargo_number = '', client_id = '' } = req.body;
+    const { tracks: rawTracks = [], cargo_number = '', client_id = '', link_only = false } = req.body;
     const cargoNumber  = cargo_number.toString().trim();
     const clientId     = client_id.toString().trim();
     const operatorName = req.user?.username || 'unknown';
+    const linkOnly     = !!link_only;
 
     const seen = new Set(); const duplicates = [];
     const tracks = rawTracks
@@ -1033,7 +1034,7 @@ app.post('/api/admin/shipments', requireRole('admin', 'employee'), async (req, r
     const sheetRange = process.env.SHEET_RANGE || 'Scans!A:Z';
     const sheetName  = sheetRange.split('!')[0];
 
-    // 1) Читаем Scans, проставляем только status='отправлено'
+    // 1) Читаем Scans; если link_only=false — проставляем status='отправлено'
     const readRes = await sheets.spreadsheets.values.get({
       spreadsheetId: SCANS_SPREADSHEET_ID,
       range: sheetRange,
@@ -1062,9 +1063,11 @@ app.post('/api/admin/shipments', requireRole('admin', 'employee'), async (req, r
       const rowNums = trackIndex[track];
       if (!rowNums) { notFound.push(track); continue; }
       for (const rowNum of rowNums) {
-        const currentStatus = (rows[rowNum - 1][statusCol] || '').toString().trim();
-        if (normStatus(currentStatus) === 'shipped') { alreadyShipped.push(track); continue; }
-        batchData.push({ range: `${sheetName}!${toLetterCol(statusCol)}${rowNum}`, values: [['отправлено']] });
+        if (!linkOnly) {
+          const currentStatus = (rows[rowNum - 1][statusCol] || '').toString().trim();
+          if (normStatus(currentStatus) === 'shipped') { alreadyShipped.push(track); continue; }
+          batchData.push({ range: `${sheetName}!${toLetterCol(statusCol)}${rowNum}`, values: [['отправлено']] });
+        }
         updated.push(track);
       }
     }
@@ -1132,6 +1135,7 @@ app.post('/api/admin/shipments', requireRole('admin', 'employee'), async (req, r
       cargo_number: cargoNumber,
       cargo_row_added: cargoRowAdded,
       updated: updated.length,
+      link_only: linkOnly,
       notFound, duplicates, alreadyShipped,
     });
   } catch (err) {
