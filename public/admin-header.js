@@ -12,6 +12,7 @@
     { href: '/cargo-dashboard.html', label: 'Аналитика грузов' },
     { href: '/tasks.html',           label: 'Задачи' },
     { href: '/upload.html',          label: 'Создать отгрузку' },
+    { href: '/unlinked.html',        label: 'Непривязанные' },
     { href: '/history.html',         label: 'История' },
   ];
 

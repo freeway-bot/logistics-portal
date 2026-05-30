@@ -1,0 +1,329 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <link rel="icon" type="image/png" href="/freewaychina-09.png">
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Непривязанные отправки</title>
+  <link rel="stylesheet" href="style.css" />
+  <link rel="stylesheet" href="admin.css" />
+  <style>
+    .unlinked-toolbar {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      flex-wrap: wrap;
+      padding: 12px 16px;
+      border-bottom: 1px solid var(--border);
+      background: var(--surface-2);
+    }
+
+    .unlinked-search {
+      padding: 8px 12px 8px 34px;
+      border: 1.5px solid var(--border);
+      border-radius: var(--radius-sm);
+      font-size: 13px;
+      color: var(--text);
+      background: var(--surface-2) url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='14' height='14' fill='none' stroke='%23999' stroke-width='2' viewBox='0 0 24 24'%3E%3Ccircle cx='11' cy='11' r='8'/%3E%3Cpath d='m21 21-4.35-4.35'/%3E%3C/svg%3E") no-repeat 10px center;
+      outline: none;
+      min-width: 200px;
+      transition: border-color var(--t);
+    }
+    .unlinked-search:focus { border-color: var(--primary); background-color: var(--surface); }
+
+    .unlinked-client-select {
+      padding: 8px 32px 8px 12px;
+      border: 1.5px solid var(--border);
+      border-radius: var(--radius-sm);
+      font-size: 13px;
+      color: var(--text);
+      background: var(--surface-2);
+      outline: none;
+      cursor: pointer;
+      min-width: 160px;
+      appearance: none;
+      -webkit-appearance: none;
+      background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' fill='none' stroke='%23999' stroke-width='2' viewBox='0 0 24 24'%3E%3Cpolyline points='6 9 12 15 18 9'/%3E%3C/svg%3E");
+      background-repeat: no-repeat;
+      background-position: right 10px center;
+      transition: border-color var(--t);
+    }
+    .unlinked-client-select:focus { border-color: var(--primary); }
+
+    .toolbar-spacer { flex: 1; }
+
+    .toolbar-count {
+      font-size: 12px;
+      color: var(--text-3);
+      white-space: nowrap;
+    }
+
+    .unlinked-table { width: 100%; border-collapse: collapse; }
+    .unlinked-table th {
+      padding: 10px 14px;
+      text-align: left;
+      font-size: 11px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: .4px;
+      color: var(--text-3);
+      border-bottom: 1px solid var(--border);
+      white-space: nowrap;
+      background: var(--surface-2);
+      position: sticky;
+      top: 0;
+      z-index: 1;
+    }
+    .unlinked-table th:first-child { width: 40px; }
+    .unlinked-table td {
+      padding: 10px 14px;
+      font-size: 13px;
+      border-bottom: 1px solid var(--border-light);
+      color: var(--text);
+    }
+    .unlinked-table tr:last-child td { border-bottom: none; }
+    .unlinked-table tr:hover td { background: var(--surface-2); }
+    .unlinked-table tr.selected td { background: var(--primary-bg); }
+
+    .unlinked-table input[type="checkbox"] {
+      width: 15px; height: 15px; cursor: pointer; accent-color: var(--primary);
+    }
+
+    .track-mono {
+      font-family: 'Courier New', monospace;
+      font-size: 12px;
+      color: var(--text);
+    }
+
+    .client-chip {
+      display: inline-block;
+      padding: 2px 8px;
+      border-radius: 20px;
+      font-size: 11px;
+      font-weight: 700;
+      background: var(--primary-bg);
+      color: var(--primary);
+      border: 1px solid var(--primary-bdr);
+    }
+
+    /* Sticky action bar */
+    .action-bar {
+      position: fixed;
+      bottom: 0; left: 0; right: 0;
+      background: var(--surface);
+      border-top: 2px solid var(--primary);
+      padding: 14px 24px;
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      flex-wrap: wrap;
+      box-shadow: 0 -4px 20px rgba(0,0,0,.15);
+      z-index: 100;
+      transform: translateY(100%);
+      transition: transform .2s ease;
+    }
+    .action-bar.visible { transform: translateY(0); }
+
+    .action-bar-label {
+      font-size: 13px;
+      font-weight: 600;
+      color: var(--text);
+      white-space: nowrap;
+    }
+    .action-bar-label span {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      min-width: 22px;
+      height: 22px;
+      padding: 0 6px;
+      background: var(--primary);
+      color: #fff;
+      border-radius: 11px;
+      font-size: 11px;
+      font-weight: 700;
+      margin-right: 4px;
+    }
+
+    .action-bar-input {
+      padding: 9px 12px;
+      border: 1.5px solid var(--border);
+      border-radius: var(--radius-sm);
+      font-size: 13px;
+      color: var(--text);
+      background: var(--surface-2);
+      outline: none;
+      min-width: 200px;
+      font-family: 'Courier New', monospace;
+      transition: border-color var(--t);
+    }
+    .action-bar-input:focus { border-color: var(--primary); background: var(--surface); }
+    .action-bar-input::placeholder { font-family: system-ui; color: var(--text-3); }
+
+    .btn-link {
+      padding: 9px 18px;
+      background: var(--primary);
+      color: #fff;
+      border: none;
+      border-radius: var(--radius-sm);
+      font-size: 13px;
+      font-weight: 700;
+      cursor: pointer;
+      white-space: nowrap;
+      transition: background var(--t);
+    }
+    .btn-link:hover { background: var(--primary-h); }
+    .btn-link:disabled { opacity: .6; cursor: not-allowed; }
+
+    .btn-deselect {
+      padding: 9px 14px;
+      background: transparent;
+      color: var(--text-2);
+      border: 1.5px solid var(--border);
+      border-radius: var(--radius-sm);
+      font-size: 13px;
+      cursor: pointer;
+      white-space: nowrap;
+      transition: all var(--t);
+    }
+    .btn-deselect:hover { border-color: var(--text-3); color: var(--text); }
+
+    .action-bar-spacer { flex: 1; }
+
+    /* Page bottom padding when bar is visible */
+    .page-content { padding-bottom: 80px; }
+
+    .stat-chips {
+      display: flex;
+      gap: 10px;
+      flex-wrap: wrap;
+      margin-bottom: 16px;
+    }
+    .stat-chip {
+      background: var(--surface-2);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-sm);
+      padding: 8px 14px;
+      font-size: 13px;
+    }
+    .stat-chip strong { color: var(--text); font-weight: 700; }
+    .stat-chip span { color: var(--text-3); font-size: 11px; margin-left: 4px; }
+  </style>
+</head>
+<body>
+  <div id="adminHeader"></div>
+  <script src="admin-header.js"></script>
+
+  <main class="page-content">
+
+    <!-- Header -->
+    <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:12px;margin-bottom:20px">
+      <div>
+        <h1 style="font-size:20px;font-weight:800;color:var(--text);margin:0 0 4px">Отправки без привязки к грузу</h1>
+        <p style="font-size:13px;color:var(--text-3);margin:0">Треки со статусом «Отправлено», не привязанные ни к одному коду груза</p>
+      </div>
+    </div>
+
+    <!-- Stats -->
+    <div class="stat-chips" id="statChips">
+      <div class="stat-chip"><strong id="statTotal">—</strong><span>всего треков</span></div>
+      <div class="stat-chip"><strong id="statClients">—</strong><span>клиентов</span></div>
+    </div>
+
+    <!-- Main card -->
+    <div class="admin-card" style="padding:0;overflow:hidden" id="mainCard">
+
+      <!-- Loading -->
+      <div id="stateLoading" class="state-center" style="padding:60px">
+        <div class="spinner"></div>
+        <p class="state-desc">Загружаем данные…</p>
+      </div>
+
+      <!-- Error -->
+      <div id="stateError" class="state-center hidden" style="padding:60px">
+        <div class="state-icon red">
+          <svg width="22" height="22" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+            <circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/>
+          </svg>
+        </div>
+        <p class="state-title">Ошибка загрузки</p>
+        <p class="state-desc" id="errorMsg"></p>
+        <button class="btn-link" style="margin-top:12px" onclick="loadData()">Повторить</button>
+      </div>
+
+      <!-- Empty -->
+      <div id="stateEmpty" class="state-center hidden" style="padding:60px">
+        <div class="state-icon green">
+          <svg width="22" height="22" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+            <polyline points="20 6 9 17 4 12"/>
+          </svg>
+        </div>
+        <p class="state-title">Всё привязано</p>
+        <p class="state-desc">Нет отправленных треков без кода груза</p>
+      </div>
+
+      <!-- Table -->
+      <div id="stateTable" class="hidden">
+
+        <!-- Toolbar -->
+        <div class="unlinked-toolbar">
+          <select class="unlinked-client-select" id="clientFilter">
+            <option value="">Все клиенты</option>
+          </select>
+          <input class="unlinked-search" type="text" id="searchInput" placeholder="Поиск по треку…" />
+          <div class="toolbar-spacer"></div>
+          <span class="toolbar-count" id="toolbarCount"></span>
+          <label style="display:flex;align-items:center;gap:6px;font-size:13px;color:var(--text-2);cursor:pointer;white-space:nowrap">
+            <input type="checkbox" id="selectAllCheck" style="width:15px;height:15px;accent-color:var(--primary);cursor:pointer" />
+            Выбрать все
+          </label>
+        </div>
+
+        <!-- Table -->
+        <div style="overflow-x:auto">
+          <table class="unlinked-table">
+            <thead>
+              <tr>
+                <th><input type="checkbox" id="headerCheck" style="width:15px;height:15px;accent-color:var(--primary);cursor:pointer" /></th>
+                <th>Трек-номер</th>
+                <th>Клиент</th>
+                <th>Дата</th>
+                <th>Категория</th>
+              </tr>
+            </thead>
+            <tbody id="tableBody"></tbody>
+          </table>
+        </div>
+
+        <!-- Pagination -->
+        <div style="display:flex;align-items:center;justify-content:space-between;padding:12px 16px;border-top:1px solid var(--border);flex-wrap:wrap;gap:8px">
+          <span style="font-size:12px;color:var(--text-3)" id="pageInfo"></span>
+          <div style="display:flex;gap:6px">
+            <button class="btn-deselect" id="prevBtn" style="padding:6px 12px;font-size:12px">← Назад</button>
+            <button class="btn-deselect" id="nextBtn" style="padding:6px 12px;font-size:12px">Вперёд →</button>
+          </div>
+        </div>
+
+      </div>
+    </div>
+
+  </main>
+
+  <!-- Sticky action bar -->
+  <div class="action-bar" id="actionBar">
+    <div class="action-bar-label">
+      <span id="selectedCount">0</span> треков выбрано
+    </div>
+    <input class="action-bar-input" type="text" id="cargoInput"
+      placeholder="Номер груза (напр. FWC007-0531-2)"
+      autocapitalize="characters" spellcheck="false" />
+    <button class="btn-link" id="linkBtn">Привязать к грузу →</button>
+    <div class="action-bar-spacer"></div>
+    <button class="btn-deselect" id="deselectBtn">Снять выбор</button>
+  </div>
+
+  <script src="auth-guard.js"></script>
+  <script src="utils.js"></script>
+  <script src="unlinked.js"></script>
+</body>
+</html>

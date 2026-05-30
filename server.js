@@ -850,6 +850,26 @@ app.get('/api/admin/recent', requireRole('admin', 'employee'), async (req, res) 
   } catch (err) { res.status(500).json({ error: 'Ошибка' }); }
 });
 
+// GET /api/admin/unlinked-parcels — отправленные посылки без привязки к грузу
+app.get('/api/admin/unlinked-parcels', requireRole('admin', 'employee'), async (req, res) => {
+  try {
+    const [{ data: allData }, otpData] = await Promise.all([getAllData(), getOtpravleniya()]);
+    const linkedTracks = new Set(otpData.map(r => (r.track || '').toLowerCase()).filter(Boolean));
+    const unlinked = allData
+      .filter(r => normStatus(r.status) === 'shipped' && !linkedTracks.has((r.track_number || '').toLowerCase()))
+      .map(r => ({
+        track_number: r.track_number || '',
+        client_id:    r.client_id    || '',
+        date:         r.date         || '',
+        category:     r.category     || '',
+      }));
+    res.json({ total: unlinked.length, data: unlinked });
+  } catch (err) {
+    console.error('[/admin/unlinked-parcels]', err.message);
+    res.status(500).json({ error: 'Ошибка сервера' });
+  }
+});
+
 // GET /api/admin/daily
 app.get('/api/admin/daily', requireRole('admin', 'employee'), async (req, res) => {
   try {
