@@ -8,6 +8,65 @@
   <link rel="stylesheet" href="style.css" />
   <link rel="stylesheet" href="admin.css" />
   <style>
+    /* Lookup card */
+    .lookup-row {
+      display: flex;
+      gap: 8px;
+      align-items: center;
+      flex-wrap: wrap;
+    }
+    .lookup-input {
+      flex: 1;
+      min-width: 200px;
+      padding: 10px 14px;
+      border: 1.5px solid var(--border);
+      border-radius: var(--radius-sm);
+      font-size: 13px;
+      font-family: 'Courier New', monospace;
+      color: var(--text);
+      background: var(--surface-2);
+      outline: none;
+      transition: border-color var(--t);
+    }
+    .lookup-input:focus { border-color: var(--primary); background: var(--surface); }
+    .lookup-input::placeholder { font-family: system-ui; color: var(--text-3); }
+    .btn-lookup {
+      padding: 10px 18px;
+      background: var(--primary);
+      color: #fff;
+      border: none;
+      border-radius: var(--radius-sm);
+      font-size: 13px;
+      font-weight: 700;
+      cursor: pointer;
+      white-space: nowrap;
+      transition: background var(--t);
+    }
+    .btn-lookup:hover  { background: var(--primary-h); }
+    .btn-lookup:disabled { opacity: .5; cursor: not-allowed; }
+
+    .lookup-result-table { width: 100%; border-collapse: collapse; margin-top: 14px; }
+    .lookup-result-table th {
+      padding: 8px 12px;
+      text-align: left;
+      font-size: 11px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: .4px;
+      color: var(--text-3);
+      border-bottom: 1px solid var(--border);
+      background: var(--surface-2);
+    }
+    .lookup-result-table td {
+      padding: 9px 12px;
+      font-size: 13px;
+      border-bottom: 1px solid var(--border-light);
+      color: var(--text);
+    }
+    .lookup-result-table tr:last-child td { border-bottom: none; }
+    .lookup-result-table tr:hover td { background: var(--surface-2); }
+    .lookup-empty { text-align: center; padding: 20px; font-size: 13px; color: var(--text-3); }
+
     .unlinked-toolbar {
       display: flex;
       align-items: center;
@@ -221,6 +280,42 @@
       <div>
         <h1 style="font-size:20px;font-weight:800;color:var(--text);margin:0 0 4px">Отправки без привязки к грузу</h1>
         <p style="font-size:13px;color:var(--text-3);margin:0">Треки со статусом «Отправлено», не привязанные ни к одному коду груза</p>
+      </div>
+    </div>
+
+    <!-- Lookup by cargo number -->
+    <div class="admin-card" style="margin-bottom:20px">
+      <div class="card-title" style="margin-bottom:12px">Поиск треков по коду груза</div>
+      <div class="lookup-row">
+        <input class="lookup-input" id="lookupInput" type="text"
+          placeholder="Введите код груза, например FWC007-0531-2"
+          autocapitalize="characters" spellcheck="false" />
+        <button class="btn-lookup" id="lookupBtn">Найти →</button>
+      </div>
+      <div id="lookupResult" style="display:none">
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-top:14px;flex-wrap:wrap;gap:8px">
+          <div style="font-size:13px;color:var(--text-2)">
+            Груз <strong id="lookupCargoLabel" style="color:var(--text);font-family:'Courier New',monospace"></strong>
+            — <span id="lookupTotal">0</span> трек(ов)
+          </div>
+          <button class="btn-deselect" id="lookupClearBtn" style="font-size:12px;padding:5px 10px">✕ Очистить</button>
+        </div>
+        <div style="overflow-x:auto">
+          <table class="lookup-result-table">
+            <thead>
+              <tr>
+                <th>Трек-номер</th>
+                <th>Клиент</th>
+                <th>Категория</th>
+                <th>Дата поступления</th>
+                <th>Статус</th>
+                <th>Привязан</th>
+              </tr>
+            </thead>
+            <tbody id="lookupBody"></tbody>
+          </table>
+        </div>
+        <div id="lookupEmpty" class="lookup-empty" style="display:none">Треки не найдены для этого кода груза</div>
       </div>
     </div>
 

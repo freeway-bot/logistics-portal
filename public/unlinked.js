@@ -234,6 +234,78 @@ linkBtn.addEventListener('click', async () => {
   }
 });
 
+// ─── Cargo lookup ─────────────────────────────────────────────────────────────
+
+const lookupInput    = document.getElementById('lookupInput');
+const lookupBtn      = document.getElementById('lookupBtn');
+const lookupResult   = document.getElementById('lookupResult');
+const lookupBody     = document.getElementById('lookupBody');
+const lookupEmpty    = document.getElementById('lookupEmpty');
+const lookupTotal    = document.getElementById('lookupTotal');
+const lookupCargoLbl = document.getElementById('lookupCargoLabel');
+const lookupClearBtn = document.getElementById('lookupClearBtn');
+
+const STATUS_LABELS = {
+  'на складе': { label: 'На складе',  cls: 'badge-warning' },
+  'отправлено': { label: 'Отправлено', cls: 'badge-info'    },
+  'доставлено': { label: 'Доставлено', cls: 'badge-success'  },
+  'упаковано':  { label: 'Упаковано',  cls: 'badge-warning' },
+};
+
+function statusBadge(s) {
+  const sl = (s || '').toLowerCase().trim();
+  const info = STATUS_LABELS[sl];
+  if (info) return `<span class="badge ${info.cls}">${esc(info.label)}</span>`;
+  return s ? `<span class="badge">${esc(s)}</span>` : '<span style="color:var(--text-3)">—</span>';
+}
+
+async function runLookup() {
+  const cargo = lookupInput.value.trim();
+  if (!cargo) { lookupInput.focus(); return; }
+
+  lookupBtn.disabled    = true;
+  lookupBtn.textContent = 'Ищем…';
+
+  try {
+    const res  = await fetch(`/api/admin/cargo-tracks?cargo_number=${encodeURIComponent(cargo)}`);
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error || 'Ошибка');
+
+    lookupCargoLbl.textContent = cargo.toUpperCase();
+    lookupTotal.textContent    = data.total;
+    lookupResult.style.display = 'block';
+
+    if (data.total === 0) {
+      lookupBody.innerHTML       = '';
+      lookupEmpty.style.display  = 'block';
+    } else {
+      lookupEmpty.style.display  = 'none';
+      lookupBody.innerHTML = data.data.map(r => `
+        <tr>
+          <td><span class="track-mono">${esc(r.track_number || '—')}</span></td>
+          <td><span class="client-chip">${esc(r.client_id || '—')}</span></td>
+          <td style="color:var(--text-2)">${esc(r.category || '—')}</td>
+          <td style="color:var(--text-2);font-size:12px">${esc(r.date || '—')}</td>
+          <td>${statusBadge(r.status)}</td>
+          <td style="color:var(--text-3);font-size:12px">${esc(r.date_linked || '—')}</td>
+        </tr>`).join('');
+    }
+  } catch (err) {
+    toast(err.message, 'error');
+  } finally {
+    lookupBtn.disabled    = false;
+    lookupBtn.textContent = 'Найти →';
+  }
+}
+
+lookupBtn.addEventListener('click', runLookup);
+lookupInput.addEventListener('keydown', e => { if (e.key === 'Enter') runLookup(); });
+lookupClearBtn.addEventListener('click', () => {
+  lookupInput.value          = '';
+  lookupResult.style.display = 'none';
+  lookupInput.focus();
+});
+
 // ─── Init ─────────────────────────────────────────────────────────────────────
 
 loadData();
