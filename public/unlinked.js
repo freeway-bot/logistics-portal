@@ -31,14 +31,27 @@ const linkBtn        = document.getElementById('linkBtn');
 const deselectBtn    = document.getElementById('deselectBtn');
 const statTotal      = document.getElementById('statTotal');
 const statClients    = document.getElementById('statClients');
+const errorMsg       = document.getElementById('errorMsg');
 
-// ─── State helpers ────────────────────────────────────────────────────────────
+// ─── Helpers ─────────────────────────────────────────────────────────────────
 
 function showState(state) {
   stateLoading.classList.toggle('hidden', state !== 'loading');
   stateError.classList.toggle('hidden',   state !== 'error');
   stateEmpty.classList.toggle('hidden',   state !== 'empty');
   stateTable.classList.toggle('hidden',   state !== 'table');
+}
+
+// Fetch с таймаутом 45 секунд
+async function fetchWithTimeout(url, opts = {}, ms = 45000) {
+  const ctrl = new AbortController();
+  const tid  = setTimeout(() => ctrl.abort(), ms);
+  try {
+    const res = await fetch(url, { ...opts, signal: ctrl.signal });
+    return res;
+  } finally {
+    clearTimeout(tid);
+  }
 }
 
 // ─── Load ─────────────────────────────────────────────────────────────────────
@@ -48,7 +61,7 @@ async function loadData() {
   selected.clear();
   updateActionBar();
   try {
-    const res  = await fetch('/api/admin/unlinked-parcels');
+    const res  = await fetchWithTimeout('/api/admin/unlinked-parcels');
     if (res.status === 401) { window.location.href = '/'; return; }
     const body = await res.json();
     if (!res.ok) throw new Error(body.error || 'Ошибка загрузки');
@@ -57,7 +70,7 @@ async function loadData() {
 
     if (allData.length === 0) { showState('empty'); return; }
 
-    // Fill client filter
+    // Заполняем фильтр по клиентам
     const clients = [...new Set(allData.map(r => r.client_id).filter(Boolean))].sort();
     clientFilter.innerHTML = '<option value="">Все клиенты</option>' +
       clients.map(c => `<option value="${esc(c)}">${esc(c)}</option>`).join('');
@@ -68,7 +81,10 @@ async function loadData() {
     applyFilter();
     showState('table');
   } catch (err) {
-    document.getElementById('errorMsg').textContent = err.message;
+    const msg = err.name === 'AbortError'
+      ? 'Превышено время ожидания (45 сек). Сервер или Google Sheets не отвечает — попробуйте обновить страницу.'
+      : (err.message || 'Неизвестная ошибка');
+    if (errorMsg) errorMsg.textContent = msg;
     showState('error');
   }
 }
@@ -112,24 +128,19 @@ function render() {
     </tr>`;
   }).join('');
 
-  // Attach row checkbox listeners
   tableBody.querySelectorAll('.row-check').forEach(cb => {
     cb.addEventListener('change', () => toggleTrack(cb.dataset.track, cb.checked));
   });
 
-  // Header checkbox state
   const pageSelected = rows.filter(r => selected.has(r.track_number)).length;
   headerCheck.checked       = rows.length > 0 && pageSelected === rows.length;
   headerCheck.indeterminate = pageSelected > 0 && pageSelected < rows.length;
 
-  // selectAll checkbox state
   selectAllCheck.checked       = filtered.length > 0 && filtered.every(r => selected.has(r.track_number));
   selectAllCheck.indeterminate = false;
 
-  // Toolbar count
   toolbarCount.textContent = `${total} трек${total === 1 ? '' : total < 5 ? 'а' : 'ов'}`;
 
-  // Pagination
   pageInfo.textContent = total > 0 ? `Показано ${start + 1}–${end} из ${total}` : 'Нет результатов';
   prevBtn.disabled = currentPage <= 1;
   nextBtn.disabled = currentPage >= pages;
@@ -142,7 +153,6 @@ function render() {
 function toggleTrack(track, checked) {
   if (checked) selected.add(track);
   else         selected.delete(track);
-  // Update row style
   const row = tableBody.querySelector(`tr[data-track="${esc(track)}"]`);
   if (row) row.classList.toggle('selected', checked);
   syncHeaderCheck();
@@ -202,7 +212,7 @@ linkBtn.addEventListener('click', async () => {
   linkBtn.textContent = 'Привязываем…';
 
   try {
-    const res = await fetch('/api/admin/shipments', {
+    const res = await fetchWithTimeout('/api/admin/shipments', {
       method:  'POST',
       headers: { 'Content-Type': 'application/json' },
       body:    JSON.stringify({ tracks, cargo_number: cargo, link_only: true }),
@@ -211,23 +221,19 @@ linkBtn.addEventListener('click', async () => {
     if (!res.ok) throw new Error(data.error || 'Ошибка сервера');
 
     const linked = data.updated || 0;
-    const notFound = (data.notFound || []).length;
     toast(
       linked > 0
         ? `${linked} трек${linked === 1 ? '' : linked < 5 ? 'а' : 'ов'} привязано к грузу ${cargo}`
         : 'Ни один трек не привязан',
-      linked > 0 ? 'success' : 'error'
+      linked > 0 ? 'default' : 'error'
     );
 
-    // Remove successfully linked tracks from list
     if (linked > 0) {
-      const linkedSet = new Set(tracks.slice(0, linked));
-      // Re-fetch to get accurate state
+      cargoInput.value = '';
       await loadData();
     }
-    cargoInput.value = '';
   } catch (err) {
-    toast(err.message, 'error');
+    toast(err.name === 'AbortError' ? 'Превышено время ожидания' : err.message, 'error');
   } finally {
     linkBtn.disabled    = false;
     linkBtn.textContent = 'Привязать к грузу →';
@@ -245,18 +251,19 @@ const lookupTotal    = document.getElementById('lookupTotal');
 const lookupCargoLbl = document.getElementById('lookupCargoLabel');
 const lookupClearBtn = document.getElementById('lookupClearBtn');
 
+// Правильные CSS-классы из style.css
 const STATUS_LABELS = {
-  'на складе': { label: 'На складе',  cls: 'badge-warning' },
-  'отправлено': { label: 'Отправлено', cls: 'badge-info'    },
-  'доставлено': { label: 'Доставлено', cls: 'badge-success'  },
-  'упаковано':  { label: 'Упаковано',  cls: 'badge-warning' },
+  'на складе':  { label: 'На складе',  cls: 'badge-warehouse' },
+  'отправлено': { label: 'Отправлено', cls: 'badge-shipped'   },
+  'доставлено': { label: 'Доставлено', cls: 'badge-delivered'  },
+  'упаковано':  { label: 'Упаковано',  cls: 'badge-warehouse' },
 };
 
 function statusBadge(s) {
-  const sl = (s || '').toLowerCase().trim();
+  const sl   = (s || '').toLowerCase().trim();
   const info = STATUS_LABELS[sl];
   if (info) return `<span class="badge ${info.cls}">${esc(info.label)}</span>`;
-  return s ? `<span class="badge">${esc(s)}</span>` : '<span style="color:var(--text-3)">—</span>';
+  return s ? `<span class="badge badge-other">${esc(s)}</span>` : '<span style="color:var(--text-3)">—</span>';
 }
 
 async function runLookup() {
@@ -267,7 +274,8 @@ async function runLookup() {
   lookupBtn.textContent = 'Ищем…';
 
   try {
-    const res  = await fetch(`/api/admin/cargo-tracks?cargo_number=${encodeURIComponent(cargo)}`);
+    const res  = await fetchWithTimeout(`/api/admin/cargo-tracks?cargo_number=${encodeURIComponent(cargo)}`);
+    if (res.status === 401) { window.location.href = '/'; return; }
     const data = await res.json();
     if (!res.ok) throw new Error(data.error || 'Ошибка');
 
@@ -276,10 +284,10 @@ async function runLookup() {
     lookupResult.style.display = 'block';
 
     if (data.total === 0) {
-      lookupBody.innerHTML       = '';
-      lookupEmpty.style.display  = 'block';
+      lookupBody.innerHTML      = '';
+      lookupEmpty.style.display = 'block';
     } else {
-      lookupEmpty.style.display  = 'none';
+      lookupEmpty.style.display = 'none';
       lookupBody.innerHTML = data.data.map(r => `
         <tr>
           <td><span class="track-mono">${esc(r.track_number || '—')}</span></td>
@@ -291,7 +299,7 @@ async function runLookup() {
         </tr>`).join('');
     }
   } catch (err) {
-    toast(err.message, 'error');
+    toast(err.name === 'AbortError' ? 'Превышено время ожидания' : err.message, 'error');
   } finally {
     lookupBtn.disabled    = false;
     lookupBtn.textContent = 'Найти →';

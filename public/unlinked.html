@@ -331,7 +331,7 @@
       <!-- Loading -->
       <div id="stateLoading" class="state-center" style="padding:60px">
         <div class="spinner"></div>
-        <p class="state-desc">Загружаем данные…</p>
+        <p class="state-desc">Загружаем данные… (до 30 сек при первом запросе)</p>
       </div>
 
       <!-- Error -->
@@ -342,8 +342,8 @@
           </svg>
         </div>
         <p class="state-title">Ошибка загрузки</p>
-        <p class="state-desc" id="errorMsg"></p>
-        <button class="btn-link" style="margin-top:12px" onclick="loadData()">Повторить</button>
+        <p class="state-desc" id="errorMsg" style="max-width:360px;text-align:center"></p>
+        <button class="btn-link" style="margin-top:12px" onclick="loadData()">↻ Повторить</button>
       </div>
 
       <!-- Empty -->
