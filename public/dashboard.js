@@ -674,7 +674,7 @@ async function openCargoDrawer(cargoNum) {
 
   const cls = cargoStatusClass(r.status);
   const statusLabels = { delivered: 'Доставлен', transit: 'В пути', warehouse: 'На складе' };
-  const statusLabel = statusLabels[cls] || r.status || '—';
+  const headStatusLabel = statusLabels[cls] || r.status || '—';
 
   const progDots = (() => {
     if (cls === 'delivered') return ['done','done','done','done'];
@@ -690,7 +690,7 @@ async function openCargoDrawer(cargoNum) {
       <div class="ph-d-brand">FreewayChina</div>
       <div class="ph-d-actions">
         <div class="ph-d-status-pill">
-          <span class="pp-dot ${cls}"></span>${esc(statusLabel)}
+          <span class="pp-dot ${cls}"></span>${esc(headStatusLabel)}
         </div>
         <button class="ph-d-close" onclick="closeCargoDrawer()">
           <svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24">
