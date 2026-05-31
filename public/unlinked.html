@@ -365,13 +365,33 @@
         </div>
 
         <!-- Summary chips по грузам -->
-        <div id="clientCargoBadges" style="display:flex;flex-wrap:wrap;gap:8px;margin:12px 0 4px"></div>
+        <div id="clientCargoBadges" style="display:flex;flex-wrap:wrap;gap:8px;margin:12px 0 8px"></div>
+
+        <!-- Inline action row (появляется при выборе треков) -->
+        <div id="clientActionRow" style="display:none;align-items:center;gap:10px;flex-wrap:wrap;
+          padding:10px 14px;border-radius:var(--radius-sm);background:var(--primary-bg);
+          border:1px solid var(--primary-bdr);margin-bottom:10px">
+          <span style="font-size:13px;font-weight:700;color:var(--text);white-space:nowrap">
+            Выбрано: <span id="clientSelectedCount"
+              style="display:inline-flex;align-items:center;justify-content:center;min-width:22px;
+              height:22px;padding:0 6px;background:var(--primary);color:#fff;
+              border-radius:11px;font-size:11px;font-weight:700;margin-left:2px">0</span>
+          </span>
+          <input class="action-bar-input" type="text" id="clientCargoInput"
+            placeholder="Код груза (напр. FWC007-0531-2)"
+            autocapitalize="characters" spellcheck="false"
+            style="min-width:200px;padding:8px 12px" />
+          <button class="btn-link" id="clientLinkBtn" style="padding:8px 16px">Привязать к грузу →</button>
+          <button class="btn-deselect" id="clientDeselectBtn" style="padding:8px 12px">Снять выбор</button>
+        </div>
 
         <!-- Table -->
         <div style="overflow-x:auto">
           <table class="lookup-result-table" id="clientTrackTable">
             <thead>
               <tr>
+                <th style="width:36px"><input type="checkbox" id="clientHeaderCheck"
+                  style="width:15px;height:15px;accent-color:var(--primary);cursor:pointer" /></th>
                 <th>Трек-номер</th>
                 <th>Статус</th>
                 <th>Категория</th>

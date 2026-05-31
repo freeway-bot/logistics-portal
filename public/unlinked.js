@@ -377,15 +377,127 @@ lookupClearBtn.addEventListener('click', () => {
 
 // ─── Client audit ─────────────────────────────────────────────────────────────
 
-const clientSearchInput  = document.getElementById('clientSearchInput');
-const clientSearchBtn    = document.getElementById('clientSearchBtn');
-const clientResult       = document.getElementById('clientResult');
-const clientResultLabel  = document.getElementById('clientResultLabel');
-const clientResultTotal  = document.getElementById('clientResultTotal');
-const clientClearBtn     = document.getElementById('clientClearBtn');
-const clientCargoBadges  = document.getElementById('clientCargoBadges');
-const clientTrackBody    = document.getElementById('clientTrackBody');
-const clientEmpty        = document.getElementById('clientEmpty');
+const clientSearchInput   = document.getElementById('clientSearchInput');
+const clientSearchBtn     = document.getElementById('clientSearchBtn');
+const clientResult        = document.getElementById('clientResult');
+const clientResultLabel   = document.getElementById('clientResultLabel');
+const clientResultTotal   = document.getElementById('clientResultTotal');
+const clientClearBtn      = document.getElementById('clientClearBtn');
+const clientCargoBadges   = document.getElementById('clientCargoBadges');
+const clientTrackBody     = document.getElementById('clientTrackBody');
+const clientEmpty         = document.getElementById('clientEmpty');
+const clientActionRow     = document.getElementById('clientActionRow');
+const clientSelectedCount = document.getElementById('clientSelectedCount');
+const clientCargoInput    = document.getElementById('clientCargoInput');
+const clientLinkBtn       = document.getElementById('clientLinkBtn');
+const clientDeselectBtn   = document.getElementById('clientDeselectBtn');
+const clientHeaderCheck   = document.getElementById('clientHeaderCheck');
+
+let clientSelected = new Set();   // треки, отмеченные в таблице клиента
+let clientRows     = [];           // текущий список треков для таблицы
+
+function updateClientActionRow() {
+  const n = clientSelected.size;
+  clientSelectedCount.textContent = n;
+  clientActionRow.style.display   = n > 0 ? 'flex' : 'none';
+}
+
+function renderClientTable() {
+  clientTrackBody.innerHTML = clientRows.map(r => {
+    const unlinked = !r.cargo_number;
+    const chk      = clientSelected.has(r.track_number);
+    return `<tr style="${unlinked ? 'background:var(--surface-2)' : ''}" data-track="${esc(r.track_number)}">
+      <td><input type="checkbox" class="client-row-check"
+        data-track="${esc(r.track_number)}" ${chk ? 'checked' : ''}
+        style="width:15px;height:15px;accent-color:var(--primary);cursor:pointer" /></td>
+      <td><span class="track-mono">${esc(r.track_number || '—')}</span></td>
+      <td>${statusBadge(r.status)}</td>
+      <td style="color:var(--text-2)">${esc(r.category || '—')}</td>
+      <td style="color:var(--text-2);font-size:12px">${esc(r.date || '—')}</td>
+      <td style="font-family:'Courier New',monospace;font-size:12px;${unlinked ? 'color:var(--text-3)' : 'color:var(--primary);font-weight:700'}">
+        ${unlinked ? '— не привязан' : esc(r.cargo_number)}
+      </td>
+      <td style="color:var(--text-3);font-size:12px">${esc(r.date_linked || '—')}</td>
+    </tr>`;
+  }).join('');
+
+  clientTrackBody.querySelectorAll('.client-row-check').forEach(cb => {
+    cb.addEventListener('change', () => {
+      if (cb.checked) clientSelected.add(cb.dataset.track);
+      else            clientSelected.delete(cb.dataset.track);
+      const row = clientTrackBody.querySelector(`tr[data-track="${esc(cb.dataset.track)}"]`);
+      if (row) row.style.outline = cb.checked ? '2px solid var(--primary)' : '';
+      syncClientHeader();
+      updateClientActionRow();
+    });
+  });
+
+  syncClientHeader();
+}
+
+function syncClientHeader() {
+  if (!clientRows.length) return;
+  const all = clientRows.every(r => clientSelected.has(r.track_number));
+  const any = clientRows.some(r => clientSelected.has(r.track_number));
+  clientHeaderCheck.checked       = all;
+  clientHeaderCheck.indeterminate = any && !all;
+}
+
+clientHeaderCheck.addEventListener('change', () => {
+  clientRows.forEach(r => {
+    if (clientHeaderCheck.checked) clientSelected.add(r.track_number);
+    else                           clientSelected.delete(r.track_number);
+  });
+  renderClientTable();
+  updateClientActionRow();
+});
+
+clientDeselectBtn.addEventListener('click', () => {
+  clientSelected.clear();
+  renderClientTable();
+  updateClientActionRow();
+});
+
+clientLinkBtn.addEventListener('click', async () => {
+  const cargo  = clientCargoInput.value.trim();
+  if (!cargo)                { clientCargoInput.focus(); toast('Введите код груза', 'error'); return; }
+  if (!clientSelected.size)  return;
+
+  const tracks = [...clientSelected];
+  clientLinkBtn.disabled    = true;
+  clientLinkBtn.textContent = 'Привязываем…';
+
+  try {
+    const res = await fetchWithTimeout('/api/admin/shipments', {
+      method:  'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body:    JSON.stringify({ tracks, cargo_number: cargo, link_only: true }),
+    });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error || 'Ошибка сервера');
+
+    const linked = data.updated || 0;
+    toast(
+      linked > 0
+        ? `${linked} трек${linked === 1 ? '' : linked < 5 ? 'а' : 'ов'} привязано к ${cargo}`
+        : 'Ни один трек не привязан',
+      linked > 0 ? 'default' : 'error'
+    );
+
+    if (linked > 0) {
+      clientCargoInput.value = '';
+      clientSelected.clear();
+      updateClientActionRow();
+      // Обновляем таблицу клиента и список непривязанных
+      await Promise.all([runClientSearch(), loadData()]);
+    }
+  } catch (err) {
+    toast(err.name === 'AbortError' ? 'Превышено время ожидания' : err.message, 'error');
+  } finally {
+    clientLinkBtn.disabled    = false;
+    clientLinkBtn.textContent = 'Привязать к грузу →';
+  }
+});
 
 async function runClientSearch() {
   const clientId = clientSearchInput.value.trim();
@@ -405,9 +517,12 @@ async function runClientSearch() {
     clientResult.style.display    = 'block';
 
     if (data.total === 0) {
-      clientTrackBody.innerHTML  = '';
-      clientEmpty.style.display  = 'block';
+      clientRows = [];
+      clientTrackBody.innerHTML   = '';
+      clientEmpty.style.display   = 'block';
       clientCargoBadges.innerHTML = '';
+      clientSelected.clear();
+      updateClientActionRow();
     } else {
       clientEmpty.style.display = 'none';
 
@@ -416,38 +531,40 @@ async function runClientSearch() {
       const sorted  = Object.entries(byCargo).sort((a, b) => b[1] - a[1]);
       clientCargoBadges.innerHTML = sorted.map(([cargo, cnt]) => {
         const isUnlinked = cargo === '—';
-        const bg  = isUnlinked ? 'var(--surface-2)' : 'var(--primary-bg)';
-        const col = isUnlinked ? 'var(--text-3)'    : 'var(--primary)';
-        const bdr = isUnlinked ? 'var(--border)'    : 'var(--primary-bdr)';
+        const bg  = isUnlinked ? '#fff7ed' : 'var(--primary-bg)';
+        const col = isUnlinked ? '#b45309'  : 'var(--primary)';
+        const bdr = isUnlinked ? '#fed7aa'  : 'var(--primary-bdr)';
         return `<span style="display:inline-flex;align-items:center;gap:5px;padding:4px 10px;
           border-radius:20px;font-size:12px;font-weight:700;background:${bg};color:${col};
-          border:1px solid ${bdr}">
+          border:1px solid ${bdr};cursor:pointer" title="Отметить все треки этого груза"
+          data-cargo="${esc(cargo)}">
           ${isUnlinked ? '⚠ Не привязан' : esc(cargo)}
           <span style="background:${col};color:#fff;border-radius:10px;padding:1px 6px;font-size:11px">${cnt}</span>
         </span>`;
       }).join('');
 
-      // Таблица треков — сортируем: сначала непривязанные
-      const rows = [...data.data].sort((a, b) => {
+      // Клик по бейджу — выделяет все треки этого груза
+      clientCargoBadges.querySelectorAll('span[data-cargo]').forEach(badge => {
+        badge.addEventListener('click', () => {
+          const cargo = badge.dataset.cargo;
+          clientRows
+            .filter(r => (r.cargo_number || '—') === cargo)
+            .forEach(r => clientSelected.add(r.track_number));
+          renderClientTable();
+          updateClientActionRow();
+        });
+      });
+
+      // Сортируем: сначала непривязанные, потом по коду груза
+      clientRows = [...data.data].sort((a, b) => {
         if (!a.cargo_number && b.cargo_number) return -1;
         if (a.cargo_number && !b.cargo_number) return 1;
         return (a.cargo_number || '').localeCompare(b.cargo_number || '');
       });
 
-      clientTrackBody.innerHTML = rows.map(r => {
-        const unlinked = !r.cargo_number;
-        const rowStyle = unlinked ? 'background:var(--surface-2)' : '';
-        return `<tr style="${rowStyle}">
-          <td><span class="track-mono">${esc(r.track_number || '—')}</span></td>
-          <td>${statusBadge(r.status)}</td>
-          <td style="color:var(--text-2)">${esc(r.category || '—')}</td>
-          <td style="color:var(--text-2);font-size:12px">${esc(r.date || '—')}</td>
-          <td style="font-family:'Courier New',monospace;font-size:12px;${unlinked ? 'color:var(--text-3)' : 'color:var(--primary);font-weight:700'}">
-            ${unlinked ? '— не привязан' : esc(r.cargo_number)}
-          </td>
-          <td style="color:var(--text-3);font-size:12px">${esc(r.date_linked || '—')}</td>
-        </tr>`;
-      }).join('');
+      clientSelected.clear();
+      updateClientActionRow();
+      renderClientTable();
     }
   } catch (err) {
     toast(err.name === 'AbortError' ? 'Превышено время ожидания' : err.message, 'error');
@@ -462,6 +579,9 @@ clientSearchInput.addEventListener('keydown', e => { if (e.key === 'Enter') runC
 clientClearBtn.addEventListener('click', () => {
   clientSearchInput.value    = '';
   clientResult.style.display = 'none';
+  clientSelected.clear();
+  clientRows = [];
+  updateClientActionRow();
   clientSearchInput.focus();
 });
 
