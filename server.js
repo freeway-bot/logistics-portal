@@ -878,7 +878,26 @@ app.get('/api/admin/cargo-tracks', requireRole('admin', 'employee'), async (req,
       };
     });
 
-    res.json({ cargo_number: cargoNum, total: tracks.length, data: tracks });
+    // Найти треки того же клиента, отправленные, но не привязанные ни к одному грузу
+    const cargoClients = new Set(tracks.map(t => t.client_id).filter(Boolean));
+    let unlinkedSameClient = [];
+    if (cargoClients.size > 0) {
+      const allLinkedTracks = new Set(otpData.map(r => (r.track || '').toLowerCase()).filter(Boolean));
+      unlinkedSameClient = allData
+        .filter(r =>
+          normStatus(r.status) === 'shipped' &&
+          cargoClients.has(r.client_id || '') &&
+          !allLinkedTracks.has((r.track_number || '').toLowerCase())
+        )
+        .map(r => ({
+          track_number: r.track_number || '',
+          client_id:    r.client_id    || '',
+          date:         r.date         || '',
+          category:     r.category     || '',
+        }));
+    }
+
+    res.json({ cargo_number: cargoNum, total: tracks.length, data: tracks, unlinked_same_client: unlinkedSameClient });
   } catch (err) {
     console.error('[/admin/cargo-tracks]', err.message);
     res.status(500).json({ error: 'Ошибка сервера' });

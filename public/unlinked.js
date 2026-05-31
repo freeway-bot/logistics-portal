@@ -246,14 +246,18 @@ linkBtn.addEventListener('click', async () => {
 
 // ─── Cargo lookup ─────────────────────────────────────────────────────────────
 
-const lookupInput    = document.getElementById('lookupInput');
-const lookupBtn      = document.getElementById('lookupBtn');
-const lookupResult   = document.getElementById('lookupResult');
-const lookupBody     = document.getElementById('lookupBody');
-const lookupEmpty    = document.getElementById('lookupEmpty');
-const lookupTotal    = document.getElementById('lookupTotal');
-const lookupCargoLbl = document.getElementById('lookupCargoLabel');
-const lookupClearBtn = document.getElementById('lookupClearBtn');
+const lookupInput       = document.getElementById('lookupInput');
+const lookupBtn         = document.getElementById('lookupBtn');
+const lookupResult      = document.getElementById('lookupResult');
+const lookupBody        = document.getElementById('lookupBody');
+const lookupEmpty       = document.getElementById('lookupEmpty');
+const lookupTotal       = document.getElementById('lookupTotal');
+const lookupCargoLbl    = document.getElementById('lookupCargoLabel');
+const lookupClearBtn    = document.getElementById('lookupClearBtn');
+const lookupMissing     = document.getElementById('lookupMissing');
+const lookupMissingBody = document.getElementById('lookupMissingBody');
+const lookupMissingCount= document.getElementById('lookupMissingCount');
+const quickLinkBtn      = document.getElementById('quickLinkBtn');
 
 // Правильные CSS-классы из style.css
 const BADGE_STATUS = {
@@ -302,6 +306,24 @@ async function runLookup() {
           <td style="color:var(--text-3);font-size:12px">${esc(r.date_linked || '—')}</td>
         </tr>`).join('');
     }
+
+    // Показываем непривязанные треки того же клиента
+    const missing = data.unlinked_same_client || [];
+    if (missing.length > 0) {
+      lookupMissingCount.textContent = missing.length;
+      lookupMissingBody.innerHTML = missing.map(r => `
+        <tr>
+          <td><span class="track-mono">${esc(r.track_number || '—')}</span></td>
+          <td><span class="client-chip">${esc(r.client_id || '—')}</span></td>
+          <td style="color:var(--text-2)">${esc(r.category || '—')}</td>
+          <td style="color:var(--text-2);font-size:12px">${esc(r.date || '—')}</td>
+        </tr>`).join('');
+      lookupMissing.style.display = 'block';
+      quickLinkBtn.onclick = () => quickLink(cargo, missing.map(r => r.track_number));
+    } else {
+      lookupMissing.style.display = 'none';
+    }
+
   } catch (err) {
     toast(err.name === 'AbortError' ? 'Превышено время ожидания' : err.message, 'error');
   } finally {
@@ -310,11 +332,46 @@ async function runLookup() {
   }
 }
 
+// Быстрая привязка найденных треков к грузу
+async function quickLink(cargo, tracks) {
+  if (!cargo || !tracks.length) return;
+  quickLinkBtn.disabled    = true;
+  quickLinkBtn.textContent = 'Привязываем…';
+  try {
+    const res = await fetchWithTimeout('/api/admin/shipments', {
+      method:  'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body:    JSON.stringify({ tracks, cargo_number: cargo, link_only: true }),
+    });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error || 'Ошибка сервера');
+
+    const linked = data.updated || 0;
+    toast(
+      linked > 0
+        ? `${linked} трек${linked === 1 ? '' : linked < 5 ? 'а' : 'ов'} привязано к грузу ${cargo}`
+        : 'Ни один трек не привязан',
+      linked > 0 ? 'default' : 'error'
+    );
+
+    if (linked > 0) {
+      // Обновляем поиск и список непривязанных
+      await Promise.all([runLookup(), loadData()]);
+    }
+  } catch (err) {
+    toast(err.name === 'AbortError' ? 'Превышено время ожидания' : err.message, 'error');
+  } finally {
+    quickLinkBtn.disabled    = false;
+    quickLinkBtn.textContent = 'Привязать все к этому грузу →';
+  }
+}
+
 lookupBtn.addEventListener('click', runLookup);
 lookupInput.addEventListener('keydown', e => { if (e.key === 'Enter') runLookup(); });
 lookupClearBtn.addEventListener('click', () => {
   lookupInput.value          = '';
   lookupResult.style.display = 'none';
+  lookupMissing.style.display = 'none';
   lookupInput.focus();
 });
 
