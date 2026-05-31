@@ -103,8 +103,8 @@ function renderResult(data) {
     { label: 'Не найдено',       value: data.notFound.length,       cls: data.notFound.length > 0 ? 'err' : 'ok' },
     { label: 'Дублей в списке',  value: data.duplicates.length,     cls: data.duplicates.length > 0 ? 'warn' : 'ok' },
   ];
-  if (!isLinkOnly) {
-    statRows.push({ label: 'Уже отправлены', value: data.alreadyShipped.length, cls: 'neu' });
+  if (!isLinkOnly && data.alreadyShipped.length > 0) {
+    statRows.push({ label: 'Статус не менялся', value: data.alreadyShipped.length, cls: 'neu' });
   }
 
   stats.innerHTML = statRows.map(s => `
@@ -137,7 +137,7 @@ function renderResult(data) {
              <div class="result-list">${data.duplicates.map(t => esc(t)).join('<br>')}</div>`;
   }
   if (!isLinkOnly && data.alreadyShipped.length > 0) {
-    html += `<div class="result-list-title">Уже были отправлены ранее (${data.alreadyShipped.length})</div>
+    html += `<div class="result-list-title">Уже были отправлены (статус не менялся, привязаны к грузу) — ${data.alreadyShipped.length}</div>
              <div class="result-list">${data.alreadyShipped.map(t => esc(t)).join('<br>')}</div>`;
   }
 

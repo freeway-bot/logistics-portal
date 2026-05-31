@@ -1120,8 +1120,12 @@ app.post('/api/admin/shipments', requireRole('admin', 'employee'), async (req, r
       for (const rowNum of rowNums) {
         if (!linkOnly) {
           const currentStatus = (rows[rowNum - 1][statusCol] || '').toString().trim();
-          if (normStatus(currentStatus) === 'shipped') { alreadyShipped.push(track); continue; }
-          batchData.push({ range: `${sheetName}!${toLetterCol(statusCol)}${rowNum}`, values: [['отправлено']] });
+          if (normStatus(currentStatus) === 'shipped') {
+            // Уже отправлен — не меняем статус, но всё равно привязываем к грузу
+            alreadyShipped.push(track);
+          } else {
+            batchData.push({ range: `${sheetName}!${toLetterCol(statusCol)}${rowNum}`, values: [['отправлено']] });
+          }
         }
         updated.push(track);
       }
@@ -1135,17 +1139,27 @@ app.post('/api/admin/shipments', requireRole('admin', 'employee'), async (req, r
     }
 
     // 2) Пишем привязки трек→груз в лист «Отправления»
+    // Сначала проверяем, какие треки уже привязаны к этому грузу — не дублируем
     try {
       await ensureOtpravleniyaSheet(sheets);
-      const otpRows = updated.map(track => [dateRu, cargoNumber, track, clientId, operatorName]);
-      if (otpRows.length > 0) {
-        await sheets.spreadsheets.values.append({
-          spreadsheetId: SCANS_SPREADSHEET_ID,
-          range: `${OTPRAVLENIYA_SHEET}!A:E`,
-          valueInputOption: 'USER_ENTERED',
-          requestBody: { values: otpRows },
-        });
-        invalidateOtpravleniyaCache();
+      if (cargoNumber && updated.length > 0) {
+        const existingOtp = await getOtpravleniya();
+        const alreadyLinked = new Set(
+          existingOtp
+            .filter(r => (r.cargo_number || '').toLowerCase() === cargoNumber.toLowerCase())
+            .map(r => (r.track || '').toLowerCase())
+        );
+        const newToLink = updated.filter(t => !alreadyLinked.has(t.toLowerCase()));
+        if (newToLink.length > 0) {
+          const otpRows = newToLink.map(track => [dateRu, cargoNumber, track, clientId, operatorName]);
+          await sheets.spreadsheets.values.append({
+            spreadsheetId: SCANS_SPREADSHEET_ID,
+            range: `${OTPRAVLENIYA_SHEET}!A:E`,
+            valueInputOption: 'USER_ENTERED',
+            requestBody: { values: otpRows },
+          });
+          invalidateOtpravleniyaCache();
+        }
       }
     } catch (otpErr) {
       console.warn('[/admin/shipments POST] Отправления:', otpErr.message);
