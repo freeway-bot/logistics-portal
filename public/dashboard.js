@@ -92,11 +92,8 @@ async function loadData() {
     allItems = body.data || [];
     updateStats();
     showState('items');
-    // Deep-link: показать именно эту посылку
-    if (_focusTrack) { activeTab = 'all'; searchQ = _focusTrack; }
     syncParcelControls();
     render();
-    highlightFocusTrack();
   } catch (err) {
     el.errorMessage.textContent = err.message;
     showState('error');
@@ -109,21 +106,6 @@ function syncParcelControls() {
   el.tabBtns.forEach(b => b.classList.toggle('active', b.dataset.tab === activeTab));
   if (el.btnTableView) el.btnTableView.classList.toggle('active', viewMode === 'table');
   if (el.btnGridView)  el.btnGridView.classList.toggle('active', viewMode === 'grid');
-}
-
-// Подсветить и проскроллить к посылке из deep-link
-function highlightFocusTrack() {
-  if (!_focusTrack) return;
-  const t = _focusTrack.toLowerCase();
-  _focusTrack = '';
-  requestAnimationFrame(() => {
-    const sel  = `[data-track="${t.replace(/["\\]/g, '')}"]`;
-    const node = (el.tableBody && el.tableBody.querySelector(sel)) ||
-                 (el.cardsGrid && el.cardsGrid.querySelector(sel));
-    if (!node) { toast('Посылка не найдена', 'error'); return; }
-    node.classList.add(viewMode === 'table' ? 'row-flash' : 'card-flash');
-    node.scrollIntoView({ behavior: 'smooth', block: 'center' });
-  });
 }
 
 // ─── Shipments ────────────────────────────────────────────────────────────────
@@ -160,9 +142,6 @@ let cargoSearch = '';
 let cargoSort   = 'date_desc';
 let cargoPeriod = 'all';
 
-// Одноразовый трек для deep-link фокуса (не персистится)
-let _focusTrack = '';
-
 // Read filter state from URL hash
 function readCargoStateFromHash() {
   const h = new URLSearchParams(location.hash.replace(/^#/, ''));
@@ -175,8 +154,6 @@ function readCargoStateFromHash() {
   if (h.has('pt'))     activeTab = h.get('pt');
   if (h.has('pq'))     searchQ   = h.get('pq');
   if (h.has('pv'))     viewMode  = h.get('pv');
-  // Deep-link на конкретную посылку
-  if (h.has('track'))  { _focusTrack = h.get('track'); activeSection = 'parcels'; }
 }
 function writeCargoStateToHash() {
   const h = new URLSearchParams();
@@ -780,13 +757,9 @@ async function openCargoDrawer(cargoNum) {
       <div class="ph-d-parcels">
         ${parcelsInCargo.map(p => {
           const num = p.track_number || '—';
-          const st  = normStatus(p.status);
-          const trk = (st === 'shipped' || st === 'delivered') && p.track_number
-            ? `<a class="pp-track track-link" href="https://t.17track.net/ru#nums=${esc(num)}" target="_blank" rel="noopener noreferrer">${esc(num)}</a>`
-            : `<span class="pp-track">${esc(num)}</span>`;
           return `<div class="ph-d-parcel">
             <span class="badge ${statusClass(p.status)}" style="flex-shrink:0">${esc(statusLabel(p.status))}</span>
-            ${trk}
+            <span class="pp-track">${esc(num)}</span>
             <span class="pp-cat" title="${esc(p.category||'')}">${esc(p.category||'')}</span>
           </div>`;
         }).join('')}
@@ -959,43 +932,23 @@ function photoBtn(url, label) {
 function trackCell(item) {
   const num = item.track_number;
   if (!num) return '<div class="cell-track"><span class="cell-track-num">—</span></div>';
-  const st = normStatus(item.status);
-  const trackHtml = (st === 'shipped' || st === 'delivered')
-    ? `<a class="cell-track-num track-link" href="https://t.17track.net/ru#nums=${esc(num)}" target="_blank" rel="noopener noreferrer" title="Отследить">${esc(num)}</a>`
-    : `<span class="cell-track-num">${esc(num)}</span>`;
   return `<div class="cell-track">
-    ${trackHtml}
+    <span class="cell-track-num">${esc(num)}</span>
     <button class="copy-sm" onclick="copyText('${esc(num)}','${esc(num)}')" title="Скопировать">
       <svg width="11" height="11" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
         <rect x="9" y="9" width="13" height="13" rx="2"/>
         <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/>
       </svg>
     </button>
-    <button class="pl-btn" onclick="copyParcelLink('${esc(num)}')" title="Скопировать ссылку на посылку">
-      <svg width="11" height="11" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
-        <path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/>
-        <path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/>
-      </svg>
-    </button>
   </div>`;
 }
 
-// Кликабельный номер груза → открывает дравер груза
+// Кликабельный номер груза → открывает детальный дравер груза
 function cargoCell(item) {
   const c = item.cargo_number;
   if (!c) return '<span style="color:var(--text-3,#9ca3af);font-size:12px">—</span>';
   return `<button class="cargo-link-btn" onclick="openCargoDrawer('${esc(c)}')" title="Открыть груз ${esc(c)}">${esc(c)}</button>`;
 }
-
-// Permalink на конкретную посылку (?id=...#track=...)
-function parcelPermalink(track) {
-  const base = `${location.origin}${location.pathname}`;
-  const id   = clientId ? `?id=${encodeURIComponent(clientId)}` : '';
-  return `${base}${id}#track=${encodeURIComponent(track)}`;
-}
-window.copyParcelLink = function (track) {
-  copyText(parcelPermalink(track), 'ссылка на посылку');
-};
 
 function renderTable(items, total, totalPages) {
   el.tableBody.innerHTML = items.map(item => {
@@ -1034,14 +987,10 @@ function renderCards(items, total, totalPages) {
     const fields  = getCardFields(item, false).filter(([l]) => l !== 'Коробка');
     const photo1  = toDirectUrl(item.photo_1);
     const photo2  = toDirectUrl(item.photo_2);
-    const st      = normStatus(item.status);
     const num     = item.track_number;
-    const isActive = st === 'shipped' || st === 'delivered';
 
     const trackEl = num
-      ? (isActive
-          ? `<a class="card-track-num track-link" href="https://t.17track.net/ru#nums=${esc(num)}" target="_blank" rel="noopener noreferrer" title="Отследить">${esc(num)}</a>`
-          : `<span class="card-track-num" title="${esc(num)}">${esc(num)}</span>`)
+      ? `<span class="card-track-num" title="${esc(num)}">${esc(num)}</span>`
       : `<span class="card-track-num">—</span>`;
 
     const cardPhotoBtn = (url, lbl) => !url ? '' : `
@@ -1065,12 +1014,6 @@ function renderCards(items, total, totalPages) {
             <svg width="12" height="12" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
               <rect x="9" y="9" width="13" height="13" rx="2"/>
               <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/>
-            </svg>
-          </button>` : ''}
-          ${num ? `<button class="pl-btn" onclick="copyParcelLink('${esc(num)}')" title="Скопировать ссылку на посылку">
-            <svg width="12" height="12" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
-              <path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/>
-              <path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/>
             </svg>
           </button>` : ''}
         </div>
