@@ -256,7 +256,7 @@ const lookupCargoLbl = document.getElementById('lookupCargoLabel');
 const lookupClearBtn = document.getElementById('lookupClearBtn');
 
 // Правильные CSS-классы из style.css
-const STATUS_LABELS = {
+const BADGE_STATUS = {
   'на складе':  { label: 'На складе',  cls: 'badge-warehouse' },
   'отправлено': { label: 'Отправлено', cls: 'badge-shipped'   },
   'доставлено': { label: 'Доставлено', cls: 'badge-delivered'  },
@@ -265,7 +265,7 @@ const STATUS_LABELS = {
 
 function statusBadge(s) {
   const sl   = (s || '').toLowerCase().trim();
-  const info = STATUS_LABELS[sl];
+  const info = BADGE_STATUS[sl];
   if (info) return `<span class="badge ${info.cls}">${esc(info.label)}</span>`;
   return s ? `<span class="badge badge-other">${esc(s)}</span>` : '<span style="color:var(--text-3)">—</span>';
 }
