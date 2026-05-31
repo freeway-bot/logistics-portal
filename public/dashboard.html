@@ -644,6 +644,50 @@
       opacity: 0; transition: opacity .2s; pointer-events: none;
     }
     .tg-fab:hover .tg-fab-label { opacity: 1; }
+
+    /* Кликабельный номер груза (в таблице/карточках посылок) */
+    .cargo-link-btn {
+      display: inline-flex; align-items: center; gap: 4px;
+      max-width: 100%;
+      background: rgba(99,102,241,.08); border: 1px solid rgba(99,102,241,.22);
+      color: var(--primary, #4f46e5);
+      font: inherit; font-size: 12px; font-weight: 600;
+      padding: 3px 8px; border-radius: 7px; cursor: pointer;
+      white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+      transition: background .15s, border-color .15s, transform .1s;
+    }
+    .cargo-link-btn:hover { background: rgba(99,102,241,.16); border-color: rgba(99,102,241,.4); }
+    .cargo-link-btn:active { transform: scale(.97); }
+    .card-cargo { margin: 2px 0 8px; }
+
+    /* Подсветка посылки по deep-link */
+    @keyframes rowFlash {
+      0%   { background: rgba(99,102,241,.28); }
+      100% { background: transparent; }
+    }
+    .row-flash > td { animation: rowFlash 2.4s ease-out; }
+    .card-flash { animation: rowFlash 2.4s ease-out; }
+
+    /* Permalink-кнопка посылки */
+    .pl-btn {
+      display: inline-flex; align-items: center; justify-content: center;
+      width: 22px; height: 22px; border-radius: 6px;
+      border: 1px solid var(--border, #e5e7eb); background: var(--surface, #fff);
+      color: var(--text-3, #9ca3af); cursor: pointer; flex-shrink: 0;
+      transition: color .15s, border-color .15s;
+    }
+    .pl-btn:hover { color: var(--primary, #4f46e5); border-color: rgba(99,102,241,.4); }
+
+    /* Список посылок внутри дравера груза */
+    .ph-d-parcels { display: flex; flex-direction: column; gap: 6px; }
+    .ph-d-parcel {
+      display: flex; align-items: center; gap: 8px;
+      padding: 8px 10px; border-radius: 9px;
+      background: rgba(0,0,0,.025); border: 1px solid rgba(0,0,0,.05);
+    }
+    .ph-d-parcel .pp-track { font-size: 12.5px; font-weight: 600; color: var(--text, #111); }
+    .ph-d-parcel .pp-track.track-link { color: var(--primary, #4f46e5); text-decoration: none; }
+    .ph-d-parcel .pp-cat { font-size: 11px; color: var(--text-3, #9ca3af); margin-left: auto; max-width: 40%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   </style>
 </head>
 <body class="client-page">
@@ -773,7 +817,7 @@
         <option value="date_asc">Дата ↑ старые</option>
         <option value="status_asc">Статус А-Я</option>
         <option value="track_number_asc">Трек А-Я</option>
-        <option value="box_number_asc">Коробка А-Я</option>
+        <option value="cargo_number_asc">Груз А-Я</option>
       </select>
 
       <div class="ctrl-sep"></div>
@@ -868,7 +912,7 @@
                 <th class="sortable" data-sort="track_number">Трек-номер <span class="sort-arrow">↕</span></th>
                 <th class="sortable" data-sort="category">Категория <span class="sort-arrow">↕</span></th>
                 <th class="sortable" data-sort="status">Статус <span class="sort-arrow">↕</span></th>
-                <th class="sortable" data-sort="box_number">Коробка <span class="sort-arrow">↕</span></th>
+                <th class="sortable" data-sort="cargo_number">Груз <span class="sort-arrow">↕</span></th>
                 <th class="sortable" data-sort="date">Дата <span class="sort-arrow">↕</span></th>
                 <th>Комментарий</th>
                 <th>Фото товара</th>

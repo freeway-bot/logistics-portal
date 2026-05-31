@@ -670,7 +670,8 @@ app.get('/api/client/parcels', requireRole('client', 'admin', 'employee'), async
         const [otpData, cargoRes] = await Promise.all([getOtpravleniya(), getAllCargo()]);
         const trackToCargo = new Map();
         otpData.forEach(r => {
-          if (r.track && r.cargo_number) trackToCargo.set(r.track.toLowerCase(), r.cargo_number.toLowerCase());
+          // храним оригинальный регистр номера груза для отображения
+          if (r.track && r.cargo_number) trackToCargo.set(r.track.toLowerCase(), r.cargo_number);
         });
         const cargoArrived = new Set();
         (cargoRes.data || []).forEach(r => {
@@ -680,8 +681,10 @@ app.get('/api/client/parcels', requireRole('client', 'admin', 'employee'), async
         data = data.map(p => {
           const track = (p.track_number || '').toLowerCase();
           const cargoNum = trackToCargo.get(track);
-          if (cargoNum && cargoArrived.has(cargoNum)) return { ...p, status: 'доставлено' };
-          return p;
+          if (!cargoNum) return p;
+          const out = { ...p, cargo_number: cargoNum };
+          if (cargoArrived.has(cargoNum.toLowerCase())) out.status = 'доставлено';
+          return out;
         });
       } catch (e) {
         console.warn('[/client/parcels] delivery cross-ref failed:', e.message);

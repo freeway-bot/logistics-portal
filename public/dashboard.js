@@ -92,11 +92,38 @@ async function loadData() {
     allItems = body.data || [];
     updateStats();
     showState('items');
+    // Deep-link: показать именно эту посылку
+    if (_focusTrack) { activeTab = 'all'; searchQ = _focusTrack; }
+    syncParcelControls();
     render();
+    highlightFocusTrack();
   } catch (err) {
     el.errorMessage.textContent = err.message;
     showState('error');
   }
+}
+
+// Синхронизировать контролы раздела «Посылки» с восстановленным состоянием
+function syncParcelControls() {
+  if (el.searchInput) el.searchInput.value = searchQ;
+  el.tabBtns.forEach(b => b.classList.toggle('active', b.dataset.tab === activeTab));
+  if (el.btnTableView) el.btnTableView.classList.toggle('active', viewMode === 'table');
+  if (el.btnGridView)  el.btnGridView.classList.toggle('active', viewMode === 'grid');
+}
+
+// Подсветить и проскроллить к посылке из deep-link
+function highlightFocusTrack() {
+  if (!_focusTrack) return;
+  const t = _focusTrack.toLowerCase();
+  _focusTrack = '';
+  requestAnimationFrame(() => {
+    const sel  = `[data-track="${t.replace(/["\\]/g, '')}"]`;
+    const node = (el.tableBody && el.tableBody.querySelector(sel)) ||
+                 (el.cardsGrid && el.cardsGrid.querySelector(sel));
+    if (!node) { toast('Посылка не найдена', 'error'); return; }
+    node.classList.add(viewMode === 'table' ? 'row-flash' : 'card-flash');
+    node.scrollIntoView({ behavior: 'smooth', block: 'center' });
+  });
 }
 
 // ─── Shipments ────────────────────────────────────────────────────────────────
@@ -133,6 +160,9 @@ let cargoSearch = '';
 let cargoSort   = 'date_desc';
 let cargoPeriod = 'all';
 
+// Одноразовый трек для deep-link фокуса (не персистится)
+let _focusTrack = '';
+
 // Read filter state from URL hash
 function readCargoStateFromHash() {
   const h = new URLSearchParams(location.hash.replace(/^#/, ''));
@@ -141,6 +171,12 @@ function readCargoStateFromHash() {
   if (h.has('cp'))     cargoPeriod = h.get('cp');
   if (h.has('cq'))     cargoSearch = h.get('cq');
   if (h.has('sec'))    activeSection = h.get('sec');
+  // Состояние раздела «Посылки»
+  if (h.has('pt'))     activeTab = h.get('pt');
+  if (h.has('pq'))     searchQ   = h.get('pq');
+  if (h.has('pv'))     viewMode  = h.get('pv');
+  // Deep-link на конкретную посылку
+  if (h.has('track'))  { _focusTrack = h.get('track'); activeSection = 'parcels'; }
 }
 function writeCargoStateToHash() {
   const h = new URLSearchParams();
@@ -149,6 +185,9 @@ function writeCargoStateToHash() {
   if (cargoSort   !== 'date_desc') h.set('csort', cargoSort);
   if (cargoPeriod !== 'all')       h.set('cp', cargoPeriod);
   if (cargoSearch)                 h.set('cq', cargoSearch);
+  if (activeTab !== 'all')         h.set('pt', activeTab);
+  if (searchQ)                     h.set('pq', searchQ);
+  if (viewMode !== 'table')        h.set('pv', viewMode);
   const s = h.toString();
   history.replaceState(null, '', s ? `#${s}` : location.pathname);
 }
@@ -316,11 +355,6 @@ function renderShipments() {
     if (cls === 'delivered') cntDelivered++;
   });
 
-  document.getElementById('sSum_count').textContent  = cntAll;
-  document.getElementById('sSum_weight').textContent = fmtRuNum(totalWeight, 1);
-  document.getElementById('sSum_volume').textContent = fmtRuNum(totalVolume, 2);
-  document.getElementById('sSum_total').textContent  = fmtMoney(totalCost);
-
   document.getElementById('cf_all').textContent       = cntAll;
   document.getElementById('cf_transit').textContent   = cntTransit;
   document.getElementById('cf_delivered').textContent = cntDelivered;
@@ -406,14 +440,32 @@ function monthSummary(items) {
   return { w, v, t };
 }
 
+// Итоги по выбранному фильтру (вес / объём / стоимость / кол-во)
+function updateShipSummary(items) {
+  let w = 0, v = 0, t = 0;
+  items.forEach(r => {
+    const wn = ruNum(r.weight); if (!isNaN(wn)) w += wn;
+    const vn = ruNum(r.volume); if (!isNaN(vn)) v += vn;
+    const tn = ruNum(r.total);  if (!isNaN(tn)) t += tn;
+  });
+  const set = (id, val) => { const e = document.getElementById(id); if (e) e.textContent = val; };
+  set('sSum_count',  items.length);
+  set('sSum_weight', fmtRuNum(w, 1));
+  set('sSum_volume', fmtRuNum(v, 2));
+  set('sSum_total',  fmtMoney(t));
+}
+
 function renderCargoGroups() {
   const filtered = getFilteredShipments();
   const sorted   = getSortedShipments(filtered);
   const container = document.getElementById('cargoGroupsContainer');
 
-  // Populate lookup map for drawer
+  // Итоги отражают текущий фильтр
+  updateShipSummary(filtered);
+
+  // Полный индекс грузов для дравера (по всем грузам, не только отфильтрованным)
   _cargoDataMap = {};
-  sorted.forEach(r => { if (r.cargo_number) _cargoDataMap[r.cargo_number] = r; });
+  allShipments.forEach(r => { if (r.cargo_number) _cargoDataMap[r.cargo_number] = r; });
 
   if (sorted.length === 0) {
     container.innerHTML = `
@@ -630,9 +682,18 @@ function renderAuroraCard(r) {
 }
 
 // ─── Premium Hero Drawer ──────────────────────────────────────────────────────
-function openCargoDrawer(cargoNum) {
-  const r = _cargoDataMap[cargoNum];
-  if (!r) return;
+async function openCargoDrawer(cargoNum) {
+  // Дравер может открываться из раздела «Посылки» — грузы могли ещё не загрузиться
+  if (!shipmentsLoaded) {
+    try { await loadShipments(); } catch {}
+  }
+  let r = _cargoDataMap[cargoNum];
+  if (!r) {
+    const low = String(cargoNum).toLowerCase();
+    r = Object.values(_cargoDataMap).find(x => (x.cargo_number || '').toLowerCase() === low);
+  }
+  if (!r) { toast('Груз не найден', 'error'); return; }
+  cargoNum = r.cargo_number;
 
   const cls = cargoStatusClass(r.status);
   const statusLabels = { delivered: 'Доставлен', transit: 'В пути', warehouse: 'На складе' };
@@ -710,6 +771,28 @@ function openCargoDrawer(cargoNum) {
     }
   }
 
+  // Посылки, входящие в этот груз (привязка трек → груз)
+  const low = (r.cargo_number || '').toLowerCase();
+  const parcelsInCargo = allItems.filter(p => (p.cargo_number || '').toLowerCase() === low);
+  const parcelsHtml = parcelsInCargo.length ? `
+    <div class="ph-d-section">
+      <div class="ph-d-section-title">Посылки в грузе (${parcelsInCargo.length})</div>
+      <div class="ph-d-parcels">
+        ${parcelsInCargo.map(p => {
+          const num = p.track_number || '—';
+          const st  = normStatus(p.status);
+          const trk = (st === 'shipped' || st === 'delivered') && p.track_number
+            ? `<a class="pp-track track-link" href="https://t.17track.net/ru#nums=${esc(num)}" target="_blank" rel="noopener noreferrer">${esc(num)}</a>`
+            : `<span class="pp-track">${esc(num)}</span>`;
+          return `<div class="ph-d-parcel">
+            <span class="badge ${statusClass(p.status)}" style="flex-shrink:0">${esc(statusLabel(p.status))}</span>
+            ${trk}
+            <span class="pp-cat" title="${esc(p.category||'')}">${esc(p.category||'')}</span>
+          </div>`;
+        }).join('')}
+      </div>
+    </div>` : '';
+
   document.getElementById('phBody').innerHTML = `
     <div class="ph-d-stats">
       <div class="ph-d-stat">
@@ -725,6 +808,7 @@ function openCargoDrawer(cargoNum) {
         <div class="ph-d-stat-label">Объём</div>
       </div>
     </div>
+    ${parcelsHtml}
     ${infoRows.length ? `
     <div class="ph-d-section">
       <div class="ph-d-section-title">Информация</div>
@@ -887,19 +971,42 @@ function trackCell(item) {
         <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/>
       </svg>
     </button>
+    <button class="pl-btn" onclick="copyParcelLink('${esc(num)}')" title="Скопировать ссылку на посылку">
+      <svg width="11" height="11" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+        <path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/>
+        <path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/>
+      </svg>
+    </button>
   </div>`;
 }
+
+// Кликабельный номер груза → открывает дравер груза
+function cargoCell(item) {
+  const c = item.cargo_number;
+  if (!c) return '<span style="color:var(--text-3,#9ca3af);font-size:12px">—</span>';
+  return `<button class="cargo-link-btn" onclick="openCargoDrawer('${esc(c)}')" title="Открыть груз ${esc(c)}">${esc(c)}</button>`;
+}
+
+// Permalink на конкретную посылку (?id=...#track=...)
+function parcelPermalink(track) {
+  const base = `${location.origin}${location.pathname}`;
+  const id   = clientId ? `?id=${encodeURIComponent(clientId)}` : '';
+  return `${base}${id}#track=${encodeURIComponent(track)}`;
+}
+window.copyParcelLink = function (track) {
+  copyText(parcelPermalink(track), 'ссылка на посылку');
+};
 
 function renderTable(items, total, totalPages) {
   el.tableBody.innerHTML = items.map(item => {
     const photo1 = toDirectUrl(item.photo_1);
     const photo2 = toDirectUrl(item.photo_2);
 
-    return `<tr>
+    return `<tr data-track="${esc((item.track_number||'').toLowerCase())}">
       <td>${trackCell(item)}</td>
       <td class="cell-cat"  title="${esc(item.category||'')}">${esc(item.category||'—')}</td>
       <td><span class="badge ${statusClass(item.status)}">${esc(statusLabel(item.status))}</span></td>
-      <td class="cell-box">${esc(item.box_number||'—')}</td>
+      <td class="cell-cargo">${cargoCell(item)}</td>
       <td class="cell-date">${esc(fmtDate(item.date))}</td>
       <td class="cell-comment" title="${esc(item.comment||'')}">${esc(item.comment||'—')}</td>
       <td><div class="cell-photos">${photoBtn(photo1, 'Фото товара')}</div></td>
@@ -924,7 +1031,7 @@ function renderTable(items, total, totalPages) {
 
 function renderCards(items, total, totalPages) {
   el.cardsGrid.innerHTML = items.map(item => {
-    const fields  = getCardFields(item, false);
+    const fields  = getCardFields(item, false).filter(([l]) => l !== 'Коробка');
     const photo1  = toDirectUrl(item.photo_1);
     const photo2  = toDirectUrl(item.photo_2);
     const st      = normStatus(item.status);
@@ -950,7 +1057,7 @@ function renderCards(items, total, totalPages) {
         ${cardPhotoBtn(photo2, 'Этикетка')}
       </div>` : '';
 
-    return `<div class="card">
+    return `<div class="card" data-track="${esc((num||'').toLowerCase())}">
       <div class="card-head">
         <div class="card-track-row">
           ${trackEl}
@@ -960,9 +1067,19 @@ function renderCards(items, total, totalPages) {
               <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/>
             </svg>
           </button>` : ''}
+          ${num ? `<button class="pl-btn" onclick="copyParcelLink('${esc(num)}')" title="Скопировать ссылку на посылку">
+            <svg width="12" height="12" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+              <path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/>
+              <path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/>
+            </svg>
+          </button>` : ''}
         </div>
         <span class="badge ${statusClass(item.status)}">${esc(statusLabel(item.status))}</span>
       </div>
+      ${item.cargo_number ? `<button class="cargo-link-btn card-cargo" onclick="openCargoDrawer('${esc(item.cargo_number)}')" title="Открыть груз ${esc(item.cargo_number)}">
+        <svg width="11" height="11" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><rect x="1" y="3" width="15" height="13" rx="1"/><path d="M16 8h4l3 4v4h-7V8z"/><circle cx="5.5" cy="18.5" r="2.5"/><circle cx="18.5" cy="18.5" r="2.5"/></svg>
+        ${esc(item.cargo_number)}
+      </button>` : ''}
       ${fields.length ? `
         <div class="card-fields">
           ${fields.map(([l,v]) => `
@@ -1041,6 +1158,7 @@ el.tabBtns.forEach(btn => {
     btn.classList.add('active');
     activeTab = btn.dataset.tab;
     page = 1;
+    writeCargoStateToHash();
     render();
   });
 });
@@ -1048,6 +1166,7 @@ el.tabBtns.forEach(btn => {
 el.searchInput.addEventListener('input', e => {
   searchQ = e.target.value.trim();
   page = 1;
+  writeCargoStateToHash();
   render();
 });
 
@@ -1080,6 +1199,7 @@ el.btnTableView.addEventListener('click', () => {
   viewMode = 'table';
   el.btnTableView.classList.add('active');
   el.btnGridView.classList.remove('active');
+  writeCargoStateToHash();
   render();
 });
 
@@ -1087,6 +1207,7 @@ el.btnGridView.addEventListener('click', () => {
   viewMode = 'grid';
   el.btnGridView.classList.add('active');
   el.btnTableView.classList.remove('active');
+  writeCargoStateToHash();
   render();
 });
 

@@ -190,7 +190,7 @@ function triggerDownload(blob, filename) {
 // Known internal field names (not shown as "extra" fields)
 const KNOWN_KEYS = new Set([
   'client_id','track_number','status','date','comment',
-  'photo_1','photo_2','photo_3','send_session','box_number','category',
+  'photo_1','photo_2','photo_3','send_session','box_number','category','cargo_number',
 ]);
 
 function getPhotos(item) {
