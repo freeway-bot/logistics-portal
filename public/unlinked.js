@@ -60,11 +60,15 @@ async function loadData() {
   showState('loading');
   selected.clear();
   updateActionBar();
+  const loadMsg = stateLoading.querySelector('.state-desc');
+  if (loadMsg) loadMsg.textContent = 'Подключаемся к серверу…';
   try {
+    if (loadMsg) loadMsg.textContent = 'Запрашиваем данные у Google Sheets…';
     const res  = await fetchWithTimeout('/api/admin/unlinked-parcels');
     if (res.status === 401) { window.location.href = '/'; return; }
+    if (loadMsg) loadMsg.textContent = 'Обрабатываем ответ…';
     const body = await res.json();
-    if (!res.ok) throw new Error(body.error || 'Ошибка загрузки');
+    if (!res.ok) throw new Error(`[${res.status}] ${body.error || 'Ошибка загрузки'}`);
 
     allData = body.data || [];
 
