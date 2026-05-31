@@ -369,10 +369,100 @@ async function quickLink(cargo, tracks) {
 lookupBtn.addEventListener('click', runLookup);
 lookupInput.addEventListener('keydown', e => { if (e.key === 'Enter') runLookup(); });
 lookupClearBtn.addEventListener('click', () => {
-  lookupInput.value          = '';
-  lookupResult.style.display = 'none';
+  lookupInput.value           = '';
+  lookupResult.style.display  = 'none';
   lookupMissing.style.display = 'none';
   lookupInput.focus();
+});
+
+// ─── Client audit ─────────────────────────────────────────────────────────────
+
+const clientSearchInput  = document.getElementById('clientSearchInput');
+const clientSearchBtn    = document.getElementById('clientSearchBtn');
+const clientResult       = document.getElementById('clientResult');
+const clientResultLabel  = document.getElementById('clientResultLabel');
+const clientResultTotal  = document.getElementById('clientResultTotal');
+const clientClearBtn     = document.getElementById('clientClearBtn');
+const clientCargoBadges  = document.getElementById('clientCargoBadges');
+const clientTrackBody    = document.getElementById('clientTrackBody');
+const clientEmpty        = document.getElementById('clientEmpty');
+
+async function runClientSearch() {
+  const clientId = clientSearchInput.value.trim();
+  if (!clientId) { clientSearchInput.focus(); return; }
+
+  clientSearchBtn.disabled    = true;
+  clientSearchBtn.textContent = 'Ищем…';
+
+  try {
+    const res  = await fetchWithTimeout(`/api/admin/client-tracks?client_id=${encodeURIComponent(clientId)}`);
+    if (res.status === 401) { window.location.href = '/'; return; }
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error || 'Ошибка');
+
+    clientResultLabel.textContent = clientId.toUpperCase();
+    clientResultTotal.textContent = data.total;
+    clientResult.style.display    = 'block';
+
+    if (data.total === 0) {
+      clientTrackBody.innerHTML  = '';
+      clientEmpty.style.display  = 'block';
+      clientCargoBadges.innerHTML = '';
+    } else {
+      clientEmpty.style.display = 'none';
+
+      // Сводка-бейджи по грузам
+      const byCargo = data.by_cargo || {};
+      const sorted  = Object.entries(byCargo).sort((a, b) => b[1] - a[1]);
+      clientCargoBadges.innerHTML = sorted.map(([cargo, cnt]) => {
+        const isUnlinked = cargo === '—';
+        const bg  = isUnlinked ? 'var(--surface-2)' : 'var(--primary-bg)';
+        const col = isUnlinked ? 'var(--text-3)'    : 'var(--primary)';
+        const bdr = isUnlinked ? 'var(--border)'    : 'var(--primary-bdr)';
+        return `<span style="display:inline-flex;align-items:center;gap:5px;padding:4px 10px;
+          border-radius:20px;font-size:12px;font-weight:700;background:${bg};color:${col};
+          border:1px solid ${bdr}">
+          ${isUnlinked ? '⚠ Не привязан' : esc(cargo)}
+          <span style="background:${col};color:#fff;border-radius:10px;padding:1px 6px;font-size:11px">${cnt}</span>
+        </span>`;
+      }).join('');
+
+      // Таблица треков — сортируем: сначала непривязанные
+      const rows = [...data.data].sort((a, b) => {
+        if (!a.cargo_number && b.cargo_number) return -1;
+        if (a.cargo_number && !b.cargo_number) return 1;
+        return (a.cargo_number || '').localeCompare(b.cargo_number || '');
+      });
+
+      clientTrackBody.innerHTML = rows.map(r => {
+        const unlinked = !r.cargo_number;
+        const rowStyle = unlinked ? 'background:var(--surface-2)' : '';
+        return `<tr style="${rowStyle}">
+          <td><span class="track-mono">${esc(r.track_number || '—')}</span></td>
+          <td>${statusBadge(r.status)}</td>
+          <td style="color:var(--text-2)">${esc(r.category || '—')}</td>
+          <td style="color:var(--text-2);font-size:12px">${esc(r.date || '—')}</td>
+          <td style="font-family:'Courier New',monospace;font-size:12px;${unlinked ? 'color:var(--text-3)' : 'color:var(--primary);font-weight:700'}">
+            ${unlinked ? '— не привязан' : esc(r.cargo_number)}
+          </td>
+          <td style="color:var(--text-3);font-size:12px">${esc(r.date_linked || '—')}</td>
+        </tr>`;
+      }).join('');
+    }
+  } catch (err) {
+    toast(err.name === 'AbortError' ? 'Превышено время ожидания' : err.message, 'error');
+  } finally {
+    clientSearchBtn.disabled    = false;
+    clientSearchBtn.textContent = 'Найти →';
+  }
+}
+
+clientSearchBtn.addEventListener('click', runClientSearch);
+clientSearchInput.addEventListener('keydown', e => { if (e.key === 'Enter') runClientSearch(); });
+clientClearBtn.addEventListener('click', () => {
+  clientSearchInput.value    = '';
+  clientResult.style.display = 'none';
+  clientSearchInput.focus();
 });
 
 // ─── Init ─────────────────────────────────────────────────────────────────────

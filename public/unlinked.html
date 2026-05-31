@@ -345,6 +345,48 @@
       </div>
     </div>
 
+    <!-- Client audit -->
+    <div class="admin-card" style="margin-bottom:20px">
+      <div class="card-title" style="margin-bottom:12px">Все грузы клиента по ID</div>
+      <div class="lookup-row">
+        <input class="lookup-input" id="clientSearchInput" type="text"
+          placeholder="Введите ID клиента, например FW-0045"
+          autocapitalize="characters" spellcheck="false" />
+        <button class="btn-lookup" id="clientSearchBtn">Найти →</button>
+      </div>
+
+      <div id="clientResult" style="display:none">
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-top:14px;flex-wrap:wrap;gap:8px">
+          <div style="font-size:13px;color:var(--text-2)">
+            Клиент <strong id="clientResultLabel" style="color:var(--text);font-family:'Courier New',monospace"></strong>
+            — всего <span id="clientResultTotal">0</span> трек(ов)
+          </div>
+          <button class="btn-deselect" id="clientClearBtn" style="font-size:12px;padding:5px 10px">✕ Очистить</button>
+        </div>
+
+        <!-- Summary chips по грузам -->
+        <div id="clientCargoBadges" style="display:flex;flex-wrap:wrap;gap:8px;margin:12px 0 4px"></div>
+
+        <!-- Table -->
+        <div style="overflow-x:auto">
+          <table class="lookup-result-table" id="clientTrackTable">
+            <thead>
+              <tr>
+                <th>Трек-номер</th>
+                <th>Статус</th>
+                <th>Категория</th>
+                <th>Дата поступления</th>
+                <th>Код груза</th>
+                <th>Дата привязки</th>
+              </tr>
+            </thead>
+            <tbody id="clientTrackBody"></tbody>
+          </table>
+        </div>
+        <div id="clientEmpty" class="lookup-empty" style="display:none">Треки не найдены для этого клиента</div>
+      </div>
+    </div>
+
     <!-- Stats -->
     <div class="stat-chips" id="statChips">
       <div class="stat-chip"><strong id="statTotal">—</strong><span>всего треков</span></div>

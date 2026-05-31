@@ -904,6 +904,52 @@ app.get('/api/admin/cargo-tracks', requireRole('admin', 'employee'), async (req,
   }
 });
 
+// GET /api/admin/client-tracks?client_id=XXX — все треки клиента с указанием груза
+app.get('/api/admin/client-tracks', requireRole('admin', 'employee'), async (req, res) => {
+  try {
+    const clientId = (req.query.client_id || '').trim();
+    if (!clientId) return res.status(400).json({ error: 'Укажите client_id' });
+
+    const [{ data: allData }, otpData] = await Promise.all([getAllData(), getOtpravleniya()]);
+
+    // Все треки этого клиента из Scans
+    const clientTracks = allData.filter(r =>
+      (r.client_id || '').toLowerCase() === clientId.toLowerCase()
+    );
+
+    // Индекс Отправлений: трек → { cargo_number, date_linked }
+    const trackCargo = {};
+    otpData.forEach(r => {
+      if (r.track) trackCargo[r.track.toLowerCase()] = { cargo_number: r.cargo_number || '', date_linked: r.date || '' };
+    });
+
+    const result = clientTracks.map(r => {
+      const link = trackCargo[(r.track_number || '').toLowerCase()];
+      return {
+        track_number: r.track_number || '',
+        status:       r.status       || '',
+        category:     r.category     || '',
+        date:         r.date         || '',
+        cargo_number: link ? link.cargo_number : '',
+        date_linked:  link ? link.date_linked  : '',
+      };
+    });
+
+    // Сводка по грузам
+    const byCargo = {};
+    result.forEach(r => {
+      const key = r.cargo_number || '—';
+      if (!byCargo[key]) byCargo[key] = 0;
+      byCargo[key]++;
+    });
+
+    res.json({ client_id: clientId, total: result.length, data: result, by_cargo: byCargo });
+  } catch (err) {
+    console.error('[/admin/client-tracks]', err.message);
+    res.status(500).json({ error: 'Ошибка сервера' });
+  }
+});
+
 // GET /api/admin/unlinked-parcels — отправленные посылки без привязки к грузу
 app.get('/api/admin/unlinked-parcels', requireRole('admin', 'employee'), async (req, res) => {
   try {
